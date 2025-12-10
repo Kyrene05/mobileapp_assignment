@@ -26,7 +26,6 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.launch
 import com.example.studify.ui.theme.Cream
 import com.example.studify.ui.theme.Coffee
 import com.example.studify.ui.theme.Stone
@@ -45,10 +44,12 @@ fun AdminLoginScreen(
     var pwdVisible by rememberSaveable { mutableStateOf(false) }
 
     var error by remember { mutableStateOf<String?>(null) }
-    var loading by remember { mutableStateOf(false) }
 
     val scroll = rememberScrollState()
-    val scope = rememberCoroutineScope()
+
+    // Default admin credentials (for assignment/demo)
+    val defaultAdminEmail = "admin@studify.com"
+    val defaultAdminPassword = "admin123"
 
     Surface(color = Cream, modifier = Modifier.fillMaxSize()) {
         Column(
@@ -90,7 +91,7 @@ fun AdminLoginScreen(
                             user = it
                             error = null
                         },
-                        placeholder = "admin@example.com",
+                        placeholder = "admin@studify.com",
                         keyboardOptions = KeyboardOptions(
                             imeAction = ImeAction.Next,
                             keyboardType = KeyboardType.Email
@@ -155,27 +156,26 @@ fun AdminLoginScreen(
                 onClick = {
                     error = null
 
-                    if (!looksLikeEmailOrName(user)) {
+                    val email = user.trim()
+                    val password = pwd
+
+                    if (!looksLikeEmailOrName(email)) {
                         error = "Please enter a valid admin email."
                         return@Button
                     }
-                    if (pwd.length < 6) {
+                    if (password.length < 6) {
                         error = "Password must be at least 6 characters."
                         return@Button
                     }
 
-                    loading = true
-                    scope.launch {
-                        val result = AuthRepository.signIn(user.trim(), pwd)
-                        loading = false
-                        result.onSuccess {
-                            onAdminLoginSuccess()
-                        }.onFailure { e ->
-                            error = AuthRepository.signInErrorMessage(e)
-                        }
+                    // Hard-coded admin check
+                    if (email == defaultAdminEmail && password == defaultAdminPassword) {
+                        onAdminLoginSuccess()
+                    } else {
+                        error = "Invalid admin email or password."
                     }
                 },
-                enabled = user.isNotBlank() && pwd.length >= 6 && !loading,
+                enabled = user.isNotBlank() && pwd.length >= 6,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Banana,
                     contentColor = Coffee,
@@ -187,20 +187,11 @@ fun AdminLoginScreen(
                     .fillMaxWidth()
                     .height(52.dp)
             ) {
-                if (loading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        strokeWidth = 2.dp,
-                        color = Coffee
-                    )
-                } else {
-                    Text("Log In", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-                }
+                Text("Log In", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
             }
 
             Spacer(Modifier.height(14.dp))
 
-            // 底部：回到普通用户登录
             val backText = buildAnnotatedString {
                 withStyle(SpanStyle(color = Stone)) { append("Not an admin? ") }
                 withStyle(
@@ -218,7 +209,7 @@ fun AdminLoginScreen(
     }
 }
 
-/* ---------- 复用你原本的小组件 & helper ---------- */
+/* ---------- Reusable text field ---------- */
 
 @Composable
 private fun LabeledTextField(

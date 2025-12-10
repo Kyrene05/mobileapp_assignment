@@ -1,16 +1,16 @@
 package com.example.studify.presentation.nav
 
 import android.content.Context
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import androidx.navigation.NavType
@@ -20,9 +20,10 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.studify.data.task.Task
+import com.example.studify.presentation.admin.AdminDashboardScreen
+import com.example.studify.presentation.auth.AdminLoginScreen
 import com.example.studify.presentation.auth.AuthScreen
 import com.example.studify.presentation.auth.RegisterScreen
-import com.example.studify.presentation.auth.AdminLoginScreen
 import com.example.studify.presentation.avatar.AvatarCreateScreen
 import com.example.studify.presentation.avatar.AvatarProfile
 import com.example.studify.presentation.avatar.ShopScreen
@@ -71,7 +72,6 @@ fun NavController.navigateSingleTopTo(route: String) {
 @Composable
 fun AppNavHost() {
     val nav = rememberNavController()
-
     val levelVm: LevelViewModel = viewModel()
 
     val backStackEntry by nav.currentBackStackEntryAsState()
@@ -88,7 +88,7 @@ fun AppNavHost() {
         navController = nav,
         startDestination = Routes.SPLASH
     ) {
-        // SPLASH — decide navigation
+        // Splash – decide navigation
         composable(Routes.SPLASH) { SplashGate(nav) }
 
         // Welcome
@@ -125,7 +125,7 @@ fun AppNavHost() {
             )
         }
 
-        // ⭐ Admin login uses AdminLoginScreen
+        // Admin login
         composable(Routes.ADMIN_AUTH) {
             AdminLoginScreen(
                 onAdminLoginSuccess = {
@@ -139,16 +139,26 @@ fun AppNavHost() {
                         popUpTo(Routes.ADMIN_AUTH) { inclusive = true }
                         launchSingleTop = true
                     }
+                },
+                onForgotPassword = {
+                    nav.navigate(Routes.FORGOT_PASSWORD)
                 }
             )
         }
 
-        // ⭐ Admin Home Placeholder
+        // Admin Home – your dashboard screen
         composable(Routes.ADMIN_HOME) {
-            AdminHomePlaceholder(
-                onBackToUser = {
-                    nav.navigate(Routes.HOME) {
-                        popUpTo(Routes.ADMIN_HOME) { inclusive = true }
+            AdminDashboardScreen(
+                onShopManagementClick = {
+                    // TODO later: nav.navigate("admin_shop")
+                },
+                onViewReportClick = {
+                    // TODO later: nav.navigate("admin_report")
+                },
+                onLogoutClick = {
+                    FirebaseAuth.getInstance().signOut()
+                    nav.navigate(Routes.WELCOME) {
+                        popUpTo(Routes.SPLASH) { inclusive = true }
                         launchSingleTop = true
                     }
                 }
@@ -162,13 +172,13 @@ fun AppNavHost() {
                 onBackToLogin = { nav.popBackStack() }
             )
         }
+
         // Forgot password
         composable(Routes.FORGOT_PASSWORD) {
             com.example.studify.presentation.auth.ForgotPasswordScreen(
                 onBack = { nav.popBackStack() }
             )
         }
-
 
         // Avatar creation
         composable(Routes.AVATAR) {
@@ -236,7 +246,7 @@ fun AppNavHost() {
                 viewModel(factory = com.example.studify.presentation.tasks.TaskViewModel.Factory)
 
             val tasks by taskVm.tasks.collectAsState()
-            val task = tasks.firstOrNull { it.id == taskId }
+            val task: Task? = tasks.firstOrNull { it.id == taskId }
 
             if (task != null) {
                 TaskRecordScreen(
@@ -260,7 +270,7 @@ fun AppNavHost() {
                 viewModel(factory = com.example.studify.presentation.tasks.TaskViewModel.Factory)
 
             val tasks by taskVm.tasks.collectAsState()
-            val task = tasks.firstOrNull { it.id == taskId }
+            val task: Task? = tasks.firstOrNull { it.id == taskId }
 
             if (task != null) {
                 TaskFocusScreen(
@@ -268,12 +278,10 @@ fun AppNavHost() {
                     onBack = { nav.popBackStack() },
                     onFinish = { elapsedMinutes, earnedExp, success ->
                         if (success) {
-                            // 1) apply rewards to level system
                             levelVm.grantSessionReward(
                                 exp = earnedExp,
                                 coinsGain = earnedExp
                             )
-                            // 2) store focus statistics into Task table
                             taskVm.applyFocusResult(task, elapsedMinutes)
                         }
                         nav.popBackStack()
@@ -329,32 +337,10 @@ private fun SplashGate(nav: NavController) {
         }
     }
 
-    Surface(modifier = Modifier) {}
-}
-
-/**
- * Temporary admin home placeholder
- */
-@Composable
-private fun AdminHomePlaceholder(
-    onBackToUser: () -> Unit
-) {
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(24.dp),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text("Admin Dashboard (Placeholder)")
-            Spacer(Modifier.height(20.dp))
-            Button(onClick = onBackToUser) {
-                Text("Back to user area")
-            }
+    Surface(modifier = Modifier.fillMaxSize()) {
+        // Empty splash surface while navigation decides
+        Column(modifier = Modifier.fillMaxSize()) {
+            Text(text = "")
         }
     }
 }
