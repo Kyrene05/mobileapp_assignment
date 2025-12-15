@@ -66,7 +66,7 @@ fun WelcomeScreen(
 
             Spacer(Modifier.height(20.dp))
 
-            // --- Admin link under Start button ---
+          /*  // --- Admin link under Start button ---
             val adminText: AnnotatedString = buildAnnotatedString {
                 withStyle(SpanStyle(color = Stone, fontSize = 13.sp)) {
                     append("Admin? ")
@@ -85,9 +85,9 @@ fun WelcomeScreen(
                     append("Click here to login")
                 }
                 pop()
-            }
+            }*/
 
-            ClickableText(
+            /*ClickableText(
                 text = adminText,
                 onClick = { offset ->
                     // Only react when the red text is clicked
@@ -99,7 +99,7 @@ fun WelcomeScreen(
                         onGoAdminLogin()
                     }
                 }
-            )
+            )*/
         }
     }
 

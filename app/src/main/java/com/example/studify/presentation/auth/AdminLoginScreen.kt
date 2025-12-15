@@ -26,12 +26,12 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.studify.ui.theme.Cream
-import com.example.studify.ui.theme.Coffee
-import com.example.studify.ui.theme.Stone
-import com.example.studify.ui.theme.Banana
-import com.example.studify.ui.theme.AccentRed
-import com.example.studify.ui.theme.Paper
+import com.example.studify.ui.theme.*
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.Source
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 
 @Composable
 fun AdminLoginScreen(
@@ -39,17 +39,15 @@ fun AdminLoginScreen(
     onBackToUserLogin: () -> Unit,
     onForgotPassword: () -> Unit = {},
 ) {
-    var user by rememberSaveable { mutableStateOf("") }
+    var email by rememberSaveable { mutableStateOf("") }
     var pwd by rememberSaveable { mutableStateOf("") }
     var pwdVisible by rememberSaveable { mutableStateOf(false) }
 
     var error by remember { mutableStateOf<String?>(null) }
+    var loading by remember { mutableStateOf(false) }
 
     val scroll = rememberScrollState()
-
-    // Default admin credentials (for assignment/demo)
-    val defaultAdminEmail = "admin@studify.com"
-    val defaultAdminPassword = "admin123"
+    val scope = rememberCoroutineScope()
 
     Surface(color = Cream, modifier = Modifier.fillMaxSize()) {
         Column(
@@ -86,12 +84,12 @@ fun AdminLoginScreen(
                 Column(Modifier.padding(18.dp)) {
                     LabeledTextField(
                         label = "Admin Email",
-                        value = user,
+                        value = email,
                         onValueChange = {
-                            user = it
+                            email = it
                             error = null
                         },
-                        placeholder = "admin@studify.com",
+                        placeholder = "admin@gmail.com",
                         keyboardOptions = KeyboardOptions(
                             imeAction = ImeAction.Next,
                             keyboardType = KeyboardType.Email
@@ -121,8 +119,7 @@ fun AdminLoginScreen(
                                 )
                             }
                         },
-                        visualTransformation = if (pwdVisible) VisualTransformation.None
-                        else PasswordVisualTransformation()
+                        visualTransformation = if (pwdVisible) VisualTransformation.None else PasswordVisualTransformation()
                     )
 
                     if (error != null) {
@@ -151,31 +148,58 @@ fun AdminLoginScreen(
 
             Spacer(Modifier.height(18.dp))
 
-            // Login button
             Button(
                 onClick = {
                     error = null
+                    val e = email.trim()
+                    val p = pwd
 
-                    val email = user.trim()
-                    val password = pwd
-
-                    if (!looksLikeEmailOrName(email)) {
+                    if (!looksLikeEmail(e)) {
                         error = "Please enter a valid admin email."
                         return@Button
                     }
-                    if (password.length < 6) {
+                    if (p.length < 6) {
                         error = "Password must be at least 6 characters."
                         return@Button
                     }
 
-                    // Hard-coded admin check
-                    if (email == defaultAdminEmail && password == defaultAdminPassword) {
-                        onAdminLoginSuccess()
-                    } else {
-                        error = "Invalid admin email or password."
+                    loading = true
+                    scope.launch {
+                        try {
+                            // 1) Sign in (Firebase Auth)
+                            val result = AuthRepository.signIn(e, p)
+                            result.onFailure { throw it }
+
+                            // 2) Check Firestore role by EMAIL (more reliable than uid doc id)
+                            val snap = FirebaseFirestore.getInstance()
+                                .collection("users")
+                                .whereEqualTo("email", e)
+                                .limit(1)
+                                .get(Source.SERVER)
+                                .await()
+
+                            val doc = snap.documents.firstOrNull()
+                            val role = doc?.getString("role")
+
+                            loading = false
+
+                            if (role == "admin") {
+                                onAdminLoginSuccess()
+                            } else {
+                                FirebaseAuth.getInstance().signOut()
+                                error = "This account is not an admin."
+                            }
+                        } catch (ex: Exception) {
+                            loading = false
+                            error = try {
+                                AuthRepository.signInErrorMessage(ex)
+                            } catch (_: Exception) {
+                                ex.message ?: "Login failed."
+                            }
+                        }
                     }
                 },
-                enabled = user.isNotBlank() && pwd.length >= 6,
+                enabled = email.isNotBlank() && pwd.length >= 6 && !loading,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Banana,
                     contentColor = Coffee,
@@ -187,7 +211,15 @@ fun AdminLoginScreen(
                     .fillMaxWidth()
                     .height(52.dp)
             ) {
-                Text("Log In", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                if (loading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        strokeWidth = 2.dp,
+                        color = Coffee
+                    )
+                } else {
+                    Text("Log In", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                }
             }
 
             Spacer(Modifier.height(14.dp))
@@ -201,15 +233,12 @@ fun AdminLoginScreen(
                     )
                 ) { append("Back to user login") }
             }
-            Text(
-                backText,
-                modifier = Modifier.clickable { onBackToUserLogin() }
-            )
+            Text(backText, modifier = Modifier.clickable { onBackToUserLogin() })
         }
     }
 }
 
-/* ---------- Reusable text field ---------- */
+/* ---------- Reusable field ---------- */
 
 @Composable
 private fun LabeledTextField(
@@ -249,13 +278,12 @@ private fun LabeledTextField(
     )
 }
 
-private fun looksLikeEmailOrName(input: String): Boolean {
-    if (input.length < 3) return false
+private fun looksLikeEmail(input: String): Boolean {
+    if (input.length < 5) return false
     val emailRegex = "[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+".toRegex()
-    return if (input.contains("@")) emailRegex.matches(input) else true
+    return emailRegex.matches(input)
 }
 
-/* ---------- Preview ---------- */
 @Preview(showBackground = true, backgroundColor = 0xFFF8E9D2)
 @Composable
 private fun PreviewAdminLogin() {

@@ -1,10 +1,8 @@
 package com.example.studify.presentation.auth
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -17,8 +15,6 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -30,34 +26,20 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.delay
+import com.example.studify.ui.theme.*
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.Source
 import kotlinx.coroutines.launch
-import com.example.studify.ui.theme.Cream
-import com.example.studify.ui.theme.Coffee
-import com.example.studify.ui.theme.Stone
-import com.example.studify.ui.theme.Banana
-import com.example.studify.ui.theme.AccentRed
-import com.example.studify.ui.theme.Paper
+import kotlinx.coroutines.tasks.await
 
-
-
-/**
- * Login screen (simple, self-contained).
- *
- * Hook points:
- * - onLoginSuccess(): navigate to Home
- * - onGoRegister(): navigate to Register
- * - onForgotPassword(): open reset flow
- *
- * Replace [fakeSignIn] with your real auth later.
- */
 @Composable
 fun AuthScreen(
     onLoginSuccess: () -> Unit,
     onGoRegister: () -> Unit,
     onForgotPassword: () -> Unit = {},
+    onGoAdminLogin: () -> Unit = {},
 ) {
-    // State
     var user by rememberSaveable { mutableStateOf("") }
     var pwd by rememberSaveable { mutableStateOf("") }
     var pwdVisible by rememberSaveable { mutableStateOf(false) }
@@ -65,10 +47,8 @@ fun AuthScreen(
     var error by remember { mutableStateOf<String?>(null) }
     var loading by remember { mutableStateOf(false) }
 
-    val canSubmit = user.isNotBlank() && pwd.length >= 6
-
     val scroll = rememberScrollState()
-    val scope= rememberCoroutineScope()
+    val scope = rememberCoroutineScope()
 
     Surface(color = Cream, modifier = Modifier.fillMaxSize()) {
         Column(
@@ -81,14 +61,9 @@ fun AuthScreen(
         ) {
             Spacer(Modifier.height(50.dp))
 
-            // Title
             Text("Login", color = Coffee, fontSize = 34.sp, fontWeight = FontWeight.ExtraBold)
-            Spacer(Modifier.height(10.dp))
-
-
             Spacer(Modifier.height(24.dp))
 
-            // Card form
             Card(
                 colors = CardDefaults.cardColors(containerColor = Paper),
                 shape = RoundedCornerShape(20.dp),
@@ -106,7 +81,9 @@ fun AuthScreen(
                             keyboardType = KeyboardType.Email
                         )
                     )
+
                     Spacer(Modifier.height(12.dp))
+
                     LabeledTextField(
                         label = "Password",
                         value = pwd,
@@ -138,10 +115,19 @@ fun AuthScreen(
                     }
 
                     Spacer(Modifier.height(8.dp))
+
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
+                        Text(
+                            text = "Admin? Click here",
+                            color = AccentRed,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.clickable { onGoAdminLogin() }
+                        )
+
                         Text(
                             "Forgot password?",
                             color = Stone,
@@ -154,26 +140,61 @@ fun AuthScreen(
 
             Spacer(Modifier.height(18.dp))
 
-            // Login button
             Button(
                 onClick = {
                     error = null
-                    if (!looksLikeEmailOrName(user)) {
+
+                    val input = user.trim()
+                    val password = pwd
+
+                    if (!looksLikeEmailOrName(input)) {
                         error = "Please enter a valid email or username."
                         return@Button
                     }
-                    if (pwd.length < 6) {
+                    if (password.length < 6) {
                         error = "Password must be at least 6 characters."
                         return@Button
                     }
 
                     loading = true
                     scope.launch {
-                        val result = AuthRepository.signIn(user.trim(), pwd)
-                        loading = false
-                        result.onSuccess {
-                            onLoginSuccess()
-                        }.onFailure { e ->
+                        try {
+                            // 1) Sign in
+                            val result = AuthRepository.signIn(input, password)
+                            result.onFailure { throw it }
+
+                            // 2) Resolve actual email (if username login, Firebase gives us the email)
+                            val signedInEmail = FirebaseAuth.getInstance().currentUser?.email
+                                ?: input.takeIf { it.contains("@") }
+                                ?: ""
+
+                            if (signedInEmail.isBlank()) {
+                                FirebaseAuth.getInstance().signOut()
+                                loading = false
+                                error = "Login failed. Please try again."
+                                return@launch
+                            }
+
+                            // 3) Block admin accounts from user module
+                            val snap = FirebaseFirestore.getInstance()
+                                .collection("users")
+                                .whereEqualTo("email", signedInEmail)
+                                .limit(1)
+                                .get(Source.SERVER)
+                                .await()
+
+                            val role = snap.documents.firstOrNull()?.getString("role")
+
+                            loading = false
+
+                            if (role == "admin") {
+                                FirebaseAuth.getInstance().signOut()
+                                error = "This is an admin account. Please use Admin Login."
+                            } else {
+                                onLoginSuccess()
+                            }
+                        } catch (e: Exception) {
+                            loading = false
                             error = AuthRepository.signInErrorMessage(e)
                         }
                     }
@@ -203,18 +224,18 @@ fun AuthScreen(
 
             Spacer(Modifier.height(14.dp))
 
-            // Register hint
             val mixed = buildAnnotatedString {
                 withStyle(SpanStyle(color = Stone)) { append("New here? ") }
-                withStyle(SpanStyle(color = AccentRed, fontWeight = FontWeight.SemiBold)) { append("Create an account") }
+                withStyle(SpanStyle(color = AccentRed, fontWeight = FontWeight.SemiBold)) {
+                    append("Create an account")
+                }
             }
             Text(mixed, modifier = Modifier.clickable { onGoRegister() })
-
         }
     }
 }
 
-/* ---------- Helpers & small components ---------- */
+/* ---------- Helpers ---------- */
 
 @Composable
 private fun LabeledTextField(
@@ -227,7 +248,12 @@ private fun LabeledTextField(
     keyboardActions: KeyboardActions = KeyboardActions.Default,
     visualTransformation: VisualTransformation = VisualTransformation.None,
 ) {
-    Text(text = label, color = Coffee, fontSize = 15.sp, modifier = Modifier.padding(bottom = 6.dp, start = 2.dp))
+    Text(
+        text = label,
+        color = Coffee,
+        fontSize = 15.sp,
+        modifier = Modifier.padding(bottom = 6.dp, start = 2.dp)
+    )
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
@@ -252,20 +278,17 @@ private fun LabeledTextField(
 private fun looksLikeEmailOrName(input: String): Boolean {
     if (input.length < 3) return false
     val emailRegex = "[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+".toRegex()
-    return input.contains("@").let { if (it) emailRegex.matches(input) else true }
+    return if (input.contains("@")) emailRegex.matches(input) else true
 }
 
-/** Fake sign-in; replace with your repository call */
-private suspend fun fakeSignIn(user: String, pwd: String): Boolean {
-    delay(600) // simulate network
-    return user.isNotBlank() && pwd == "123456" // example; change/remove later
-}
-
-/* ---------- Preview ---------- */
 @Preview(showBackground = true, backgroundColor = 0xFFF8E9D2)
 @Composable
 private fun PreviewAuth() {
     MaterialTheme {
-        AuthScreen(onLoginSuccess = {}, onGoRegister = {})
+        AuthScreen(
+            onLoginSuccess = {},
+            onGoRegister = {},
+            onGoAdminLogin = {}
+        )
     }
 }

@@ -5,93 +5,76 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import androidx.navigation.NavType
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.currentBackStackEntryAsState
-import androidx.navigation.compose.rememberNavController
+import androidx.navigation.compose.*
 import androidx.navigation.navArgument
-import com.example.studify.data.task.Task
 import com.example.studify.presentation.admin.AdminDashboardScreen
-import com.example.studify.presentation.auth.AdminLoginScreen
-import com.example.studify.presentation.auth.AuthScreen
-import com.example.studify.presentation.auth.RegisterScreen
+import com.example.studify.presentation.auth.*
 import com.example.studify.presentation.avatar.AvatarCreateScreen
 import com.example.studify.presentation.avatar.AvatarProfile
 import com.example.studify.presentation.avatar.ShopScreen
 import com.example.studify.presentation.home.HomeScreen
 import com.example.studify.presentation.home.LevelViewModel
-import com.example.studify.presentation.tasks.TaskFocusScreen
-import com.example.studify.presentation.tasks.TaskRecordScreen
-import com.example.studify.presentation.tasks.TaskScreen
+import com.example.studify.presentation.tasks.*
 import com.example.studify.presentation.welcome.WelcomeScreen
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Source
 import kotlinx.coroutines.tasks.await
 
+/* ---------------- Routes ---------------- */
+
 object Routes {
     const val SPLASH = "splash"
     const val WELCOME = "welcome"
+
     const val AUTH = "auth"
     const val REGISTER = "register"
-    const val AVATAR = "avatar"
+    const val FORGOT_PASSWORD = "forgot_password"
+
     const val HOME = "home"
     const val SHOP = "shop"
     const val TASKS = "tasks"
-
     const val TASK_RECORD = "task_record"
     const val TASK_FOCUS = "task_focus"
+    const val AVATAR = "avatar"
 
-    // --- Admin routes ---
+    // Admin
     const val ADMIN_AUTH = "admin_auth"
     const val ADMIN_HOME = "admin_home"
-
-    const val FORGOT_PASSWORD = "forgot_password"
 }
 
-/**
- * Helper for bottom navigation
- */
+/* ---------------- Helper ---------------- */
+
 fun NavController.navigateSingleTopTo(route: String) {
-    this.navigate(route) {
+    navigate(route) {
         launchSingleTop = true
         restoreState = true
         popUpTo(Routes.HOME) { saveState = true }
     }
 }
 
+/* ---------------- NavHost ---------------- */
+
 @Composable
 fun AppNavHost() {
     val nav = rememberNavController()
     val levelVm: LevelViewModel = viewModel()
 
-    val backStackEntry by nav.currentBackStackEntryAsState()
-    val currentRoute = backStackEntry?.destination?.route
-
-    val bottomIndex = when (currentRoute) {
-        Routes.HOME  -> 0
-        Routes.TASKS -> 1
-        Routes.SHOP  -> 2
-        else         -> 0
-    }
-
     NavHost(
         navController = nav,
         startDestination = Routes.SPLASH
     ) {
-        // Splash – decide navigation
+
+        /* ---------- Splash ---------- */
         composable(Routes.SPLASH) { SplashGate(nav) }
 
-        // Welcome
+        /* ---------- Welcome ---------- */
         composable(Routes.WELCOME) {
             WelcomeScreen(
                 onGoLogin = {
@@ -109,7 +92,7 @@ fun AppNavHost() {
             )
         }
 
-        // Normal user login
+        /* ---------- User Login ---------- */
         composable(Routes.AUTH) {
             AuthScreen(
                 onLoginSuccess = {
@@ -119,13 +102,30 @@ fun AppNavHost() {
                     }
                 },
                 onGoRegister = { nav.navigate(Routes.REGISTER) },
-                onForgotPassword = {
-                    nav.navigate(Routes.FORGOT_PASSWORD)
-                }
+                onForgotPassword = { nav.navigate(Routes.FORGOT_PASSWORD) },
+                onGoAdminLogin = { nav.navigate(Routes.ADMIN_AUTH) }
             )
         }
 
-        // Admin login
+        /* ---------- Register ---------- */
+        composable(Routes.REGISTER) {
+            RegisterScreen(
+                onRegisterSuccess = {
+                    nav.navigate(Routes.AUTH) {
+                        popUpTo(Routes.REGISTER) { inclusive = true }
+                        launchSingleTop = true
+                    }
+                },
+                onBackToLogin = { nav.popBackStack() }
+            )
+        }
+
+        /* ---------- Forgot Password ---------- */
+        composable(Routes.FORGOT_PASSWORD) {
+            ForgotPasswordScreen(onBack = { nav.popBackStack() })
+        }
+
+        /* ---------- Admin Login ---------- */
         composable(Routes.ADMIN_AUTH) {
             AdminLoginScreen(
                 onAdminLoginSuccess = {
@@ -140,47 +140,26 @@ fun AppNavHost() {
                         launchSingleTop = true
                     }
                 },
-                onForgotPassword = {
-                    nav.navigate(Routes.FORGOT_PASSWORD)
-                }
+                onForgotPassword = { nav.navigate(Routes.FORGOT_PASSWORD) }
             )
         }
 
-        // Admin Home – your dashboard screen
+        /* ---------- Admin Dashboard ---------- */
         composable(Routes.ADMIN_HOME) {
             AdminDashboardScreen(
-                onShopManagementClick = {
-                    // TODO later: nav.navigate("admin_shop")
-                },
-                onViewReportClick = {
-                    // TODO later: nav.navigate("admin_report")
-                },
+                onShopManagementClick = {},
+                onViewReportClick = {},
                 onLogoutClick = {
                     FirebaseAuth.getInstance().signOut()
                     nav.navigate(Routes.WELCOME) {
-                        popUpTo(Routes.SPLASH) { inclusive = true }
+                        popUpTo(Routes.ADMIN_HOME) { inclusive = true }
                         launchSingleTop = true
                     }
                 }
             )
         }
 
-        // Register
-        composable(Routes.REGISTER) {
-            RegisterScreen(
-                onRegisterSuccess = {},
-                onBackToLogin = { nav.popBackStack() }
-            )
-        }
-
-        // Forgot password
-        composable(Routes.FORGOT_PASSWORD) {
-            com.example.studify.presentation.auth.ForgotPasswordScreen(
-                onBack = { nav.popBackStack() }
-            )
-        }
-
-        // Avatar creation
+        /* ---------- Avatar ---------- */
         composable(Routes.AVATAR) {
             AvatarCreateScreen(
                 onNext = { _: AvatarProfile ->
@@ -192,10 +171,10 @@ fun AppNavHost() {
             )
         }
 
-        // Home
+        /* ---------- Home ---------- */
         composable(Routes.HOME) {
             HomeScreen(
-                currentTab = bottomIndex,
+                currentTab = 0,
                 onOpenShop = { nav.navigateSingleTopTo(Routes.SHOP) },
                 onLogout = {
                     FirebaseAuth.getInstance().signOut()
@@ -210,7 +189,7 @@ fun AppNavHost() {
             )
         }
 
-        // Shop
+        /* ---------- Shop ---------- */
         composable(Routes.SHOP) {
             ShopScreen(
                 levelVm = levelVm,
@@ -218,71 +197,59 @@ fun AppNavHost() {
                 onSaveDone = {
                     nav.navigate(Routes.HOME) {
                         popUpTo(Routes.HOME) { inclusive = true }
+                        launchSingleTop = true
                     }
                 }
             )
         }
 
-        // Tasks list
+        /* ---------- Tasks ---------- */
         composable(Routes.TASKS) {
             TaskScreen(
                 onBack = { nav.navigateSingleTopTo(Routes.HOME) },
                 onNavHome = { nav.navigateSingleTopTo(Routes.HOME) },
                 onNavTasks = {},
-                onOpenRecord = { task ->
-                    nav.navigate("${Routes.TASK_RECORD}/${task.id}")
-                }
+                onOpenRecord = { task -> nav.navigate("${Routes.TASK_RECORD}/${task.id}") }
             )
         }
 
-        // Task record
+        /* ---------- Task Record ---------- */
         composable(
             route = "${Routes.TASK_RECORD}/{taskId}",
             arguments = listOf(navArgument("taskId") { type = NavType.LongType })
         ) { entry ->
             val taskId = entry.arguments!!.getLong("taskId")
-
-            val taskVm: com.example.studify.presentation.tasks.TaskViewModel =
-                viewModel(factory = com.example.studify.presentation.tasks.TaskViewModel.Factory)
-
+            val taskVm: TaskViewModel = viewModel(factory = TaskViewModel.Factory)
             val tasks by taskVm.tasks.collectAsState()
-            val task: Task? = tasks.firstOrNull { it.id == taskId }
+            val task = tasks.firstOrNull { it.id == taskId }
 
-            if (task != null) {
+            task?.let {
                 TaskRecordScreen(
-                    task = task,
+                    task = it,
                     onBack = { nav.popBackStack() },
-                    onStartFocus = { focusTask ->
-                        nav.navigate("${Routes.TASK_FOCUS}/${focusTask.id}")
-                    }
+                    onStartFocus = { focus -> nav.navigate("${Routes.TASK_FOCUS}/${focus.id}") }
                 )
             }
         }
 
-        // Task focus
+        /* ---------- Task Focus ---------- */
         composable(
             route = "${Routes.TASK_FOCUS}/{taskId}",
             arguments = listOf(navArgument("taskId") { type = NavType.LongType })
         ) { entry ->
             val taskId = entry.arguments!!.getLong("taskId")
-
-            val taskVm: com.example.studify.presentation.tasks.TaskViewModel =
-                viewModel(factory = com.example.studify.presentation.tasks.TaskViewModel.Factory)
-
+            val taskVm: TaskViewModel = viewModel(factory = TaskViewModel.Factory)
             val tasks by taskVm.tasks.collectAsState()
-            val task: Task? = tasks.firstOrNull { it.id == taskId }
+            val task = tasks.firstOrNull { it.id == taskId }
 
-            if (task != null) {
+            task?.let { t ->
                 TaskFocusScreen(
-                    task = task,
+                    task = t,
                     onBack = { nav.popBackStack() },
-                    onFinish = { elapsedMinutes, earnedExp, success ->
+                    onFinish = { minutes, exp, success ->
                         if (success) {
-                            levelVm.grantSessionReward(
-                                exp = earnedExp,
-                                coinsGain = earnedExp
-                            )
-                            taskVm.applyFocusResult(task, elapsedMinutes)
+                            levelVm.grantSessionReward(exp, exp)
+                            taskVm.applyFocusResult(t, minutes)
                         }
                         nav.popBackStack()
                     }
@@ -292,9 +259,8 @@ fun AppNavHost() {
     }
 }
 
-/**
- * Splash navigation logic
- */
+/* ---------------- Splash Logic (FIXED) ---------------- */
+
 @Composable
 private fun SplashGate(nav: NavController) {
     val context = LocalContext.current
@@ -307,21 +273,35 @@ private fun SplashGate(nav: NavController) {
         val hasSeenWelcome = prefs.getBoolean("hasSeenWelcome", false)
 
         if (user == null) {
-            if (!hasSeenWelcome) {
-                prefs.edit().putBoolean("hasSeenWelcome", true).apply()
-                nav.navigate(Routes.WELCOME) {
-                    popUpTo(Routes.SPLASH) { inclusive = true }
-                    launchSingleTop = true
-                }
-            } else {
-                nav.navigate(Routes.AUTH) {
-                    popUpTo(Routes.SPLASH) { inclusive = true }
-                    launchSingleTop = true
-                }
+            nav.navigate(if (hasSeenWelcome) Routes.AUTH else Routes.WELCOME) {
+                popUpTo(Routes.SPLASH) { inclusive = true }
+                launchSingleTop = true
+            }
+            prefs.edit().putBoolean("hasSeenWelcome", true).apply()
+            return@LaunchedEffect
+        }
+
+        // ✅ NEW: role check
+        val role = try {
+            FirebaseFirestore.getInstance()
+                .collection("users")
+                .document(user.uid)
+                .get(Source.SERVER)
+                .await()
+                .getString("role")
+        } catch (_: Exception) {
+            null
+        }
+
+        if (role == "admin") {
+            nav.navigate(Routes.ADMIN_HOME) {
+                popUpTo(Routes.SPLASH) { inclusive = true }
+                launchSingleTop = true
             }
             return@LaunchedEffect
         }
 
+        // Normal user flow: avatar gate
         val hasAvatar = try {
             FirebaseFirestore.getInstance()
                 .collection("users").document(user.uid)
@@ -338,9 +318,6 @@ private fun SplashGate(nav: NavController) {
     }
 
     Surface(modifier = Modifier.fillMaxSize()) {
-        // Empty splash surface while navigation decides
-        Column(modifier = Modifier.fillMaxSize()) {
-            Text(text = "")
-        }
+        Column { Text("") }
     }
 }
