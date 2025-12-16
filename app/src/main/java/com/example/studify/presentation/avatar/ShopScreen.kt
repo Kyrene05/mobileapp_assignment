@@ -2,6 +2,7 @@
 
 package com.example.studify.presentation.avatar
 
+import android.content.Context
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
@@ -16,14 +17,17 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.foundation.layout.systemBarsPadding
-import androidx.compose.ui.unit.sp
 import com.example.studify.presentation.home.LevelViewModel
 import com.example.studify.ui.theme.*
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -35,11 +39,16 @@ fun ShopScreen(
     onBack: () -> Unit,
     onSaveDone: () -> Unit
 ) {
+    val context = LocalContext.current
+
     var profile by remember { mutableStateOf(AvatarProfile()) }
     var owned by remember { mutableStateOf(setOf<String>()) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
     var tab by remember { mutableStateOf(ShopTab.Shop) }
+
+    // ✅ Firestore shop items (only available == true will be put here)
+    var shopItems by remember { mutableStateOf<List<AccessoryItem>>(emptyList()) }
 
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -52,6 +61,7 @@ fun ShopScreen(
 
     var gridClicksEnabled by remember { mutableStateOf(true) }
 
+    // Prevent accidental clicks during tab switch (your existing logic)
     LaunchedEffect(tab) {
         buyTarget = null
         sellTarget = null
@@ -60,7 +70,7 @@ fun ShopScreen(
         gridClicksEnabled = true
     }
 
-
+    // Load user avatar data (your existing logic)
     LaunchedEffect(Unit) {
         AvatarRepository.getUserData()
             .onSuccess { (loadedProfile, _userCoinsFromAvatar) ->
@@ -70,6 +80,38 @@ fun ShopScreen(
             }
             .onFailure { error = it.message }
         loading = false
+    }
+
+    // ✅ Realtime listen Firestore shop_items for Shop tab
+    DisposableEffect(Unit) {
+        val reg: ListenerRegistration = FirebaseFirestore.getInstance()
+            .collection("shop_items")
+            .addSnapshotListener { snap, e ->
+                if (e != null) {
+                    error = e.message ?: "Failed to load shop items."
+                    return@addSnapshotListener
+                }
+
+                val list = snap?.documents?.mapNotNull { doc ->
+                    val available = doc.getBoolean("available") ?: true
+                    if (!available) return@mapNotNull null  // ✅ Only show available items in Shop tab
+
+                    val imageKey = doc.getString("imageKey") ?: ""
+                    val resId = resolveDrawableIdByName(context, imageKey)
+                    if (resId == 0) return@mapNotNull null // if drawable not found, skip
+
+                    AccessoryItem(
+                        id = doc.id, // IMPORTANT: doc.id should be "cap/crown/shades..."
+                        name = doc.getString("name") ?: doc.id,
+                        resId = resId,
+                        price = (doc.getLong("price") ?: 0L).toInt()
+                    )
+                } ?: emptyList()
+
+                shopItems = list.sortedBy { it.name.lowercase() }
+            }
+
+        onDispose { reg.remove() }
     }
 
     if (loading) {
@@ -139,18 +181,14 @@ fun ShopScreen(
                     ) {
                         Tab(
                             selected = tab == ShopTab.Shop,
-                            onClick = {
-                                tab = ShopTab.Shop
-                            },
+                            onClick = { tab = ShopTab.Shop },
                             selectedContentColor = Coffee,
                             unselectedContentColor = Stone,
                             text = { Text("Shop") }
                         )
                         Tab(
                             selected = tab == ShopTab.Wardrobe,
-                            onClick = {
-                                tab = ShopTab.Wardrobe
-                            },
+                            onClick = { tab = ShopTab.Wardrobe },
                             selectedContentColor = Coffee,
                             unselectedContentColor = Stone,
                             text = { Text("Wardrobe") }
@@ -168,9 +206,13 @@ fun ShopScreen(
                         Spacer(Modifier.height(4.dp))
                     }
 
-                    val shopCatalog = ACCESSORIES
-                    val wardrobeCatalog = remember {
-                        (ACCESSORIES + ACCESSORIES_BASE.map {
+                    // ✅ Shop catalog comes from Firestore (available-only)
+                    val shopCatalog = shopItems
+
+                    // ✅ Wardrobe shows items user owns (owned set) + base items
+                    //    Even if admin sets available=false, owned users still can wear/sell it.
+                    val wardrobeCatalog = remember(shopItems) {
+                        (shopItems + ACCESSORIES_BASE.map {
                             AccessoryItem(
                                 id = it.id,
                                 name = it.name,
@@ -218,9 +260,7 @@ fun ShopScreen(
                                         }
 
                                         ShopTab.Shop -> {
-                                            if (!isOwned) {
-                                                buyTarget = item
-                                            }
+                                            if (!isOwned) buyTarget = item
                                         }
                                     }
                                 },
@@ -277,16 +317,13 @@ fun ShopScreen(
             onConfirm = {
                 val newCoins = coins - target.price
                 val newOwned = owned + target.id
-                val newProfile = profile.copy(
-                    owned = newOwned
-                )
+                val newProfile = profile.copy(owned = newOwned)
 
                 owned = newOwned
                 profile = newProfile
                 buyTarget = null
 
                 levelVm.updateCoins(newCoins)
-
 
                 scope.launch {
                     AvatarRepository.updateAvatarAndCoins(newProfile, newCoins)
@@ -298,7 +335,6 @@ fun ShopScreen(
     // ===== Sell Dialog（长按）=====
     val sellItem = sellTarget
     if (sellItem != null) {
-        // 简单设计：卖出价格 = 原价的一半，至少 5
         val basePrice = sellItem.price
         val sellPrice = (basePrice / 4).coerceAtLeast(5)
 
@@ -485,6 +521,15 @@ private fun AccessoryCard(
     }
 }
 
+/**
+ * Convert imageKey (e.g. "acc_cap") -> R.drawable.acc_cap
+ * If not found, returns 0.
+ */
+private fun resolveDrawableIdByName(context: Context, imageKey: String): Int {
+    if (imageKey.isBlank()) return 0
+    return context.resources.getIdentifier(imageKey, "drawable", context.packageName)
+}
+
 /* ---------- 简单 Preview（不连 ViewModel，只看 UI） ---------- */
 @Preview(
     name = "Shop – Preview UI only",
@@ -495,7 +540,6 @@ private fun AccessoryCard(
 )
 @Composable
 private fun Preview_Shop_Tab_Shop() {
-    // 只是 UI 预览用，不会用到 levelVm
     Surface(color = Cream, modifier = Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier

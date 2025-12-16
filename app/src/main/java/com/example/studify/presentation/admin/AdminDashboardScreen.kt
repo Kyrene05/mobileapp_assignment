@@ -73,7 +73,7 @@ fun AdminDashboardScreen(
             Spacer(modifier = Modifier.height(40.dp))
 
             DashboardButtonCard(
-                label = "View Report",
+                label = "View Summary Report",
                 onClick = onViewReportClick,
                 cardColor = cardColor,
                 textColor = textColor

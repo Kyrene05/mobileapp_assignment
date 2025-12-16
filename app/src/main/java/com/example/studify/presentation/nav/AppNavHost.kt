@@ -14,6 +14,8 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.*
 import androidx.navigation.navArgument
 import com.example.studify.presentation.admin.AdminDashboardScreen
+import com.example.studify.presentation.admin.ShopItemEditScreen
+import com.example.studify.presentation.admin.ShopManagementScreen
 import com.example.studify.presentation.auth.*
 import com.example.studify.presentation.avatar.AvatarCreateScreen
 import com.example.studify.presentation.avatar.AvatarProfile
@@ -47,6 +49,8 @@ object Routes {
     // Admin
     const val ADMIN_AUTH = "admin_auth"
     const val ADMIN_HOME = "admin_home"
+    const val ADMIN_SHOP_MGMT = "admin_shop_mgmt"
+    const val ADMIN_SHOP_EDIT = "admin_shop_edit"
 }
 
 /* ---------------- Helper ---------------- */
@@ -80,25 +84,22 @@ fun AppNavHost() {
                 onGoLogin = {
                     nav.navigate(Routes.AUTH) {
                         popUpTo(Routes.WELCOME) { inclusive = true }
-                        launchSingleTop = true
                     }
                 },
                 onGoAdminLogin = {
                     nav.navigate(Routes.ADMIN_AUTH) {
                         popUpTo(Routes.WELCOME) { inclusive = true }
-                        launchSingleTop = true
                     }
                 }
             )
         }
 
-        /* ---------- User Login ---------- */
+        /* ---------- User Auth ---------- */
         composable(Routes.AUTH) {
             AuthScreen(
                 onLoginSuccess = {
                     nav.navigate(Routes.SPLASH) {
                         popUpTo(Routes.AUTH) { inclusive = true }
-                        launchSingleTop = true
                     }
                 },
                 onGoRegister = { nav.navigate(Routes.REGISTER) },
@@ -107,7 +108,6 @@ fun AppNavHost() {
             )
         }
 
-        /* ---------- Register ---------- */
         composable(Routes.REGISTER) {
             RegisterScreen(
                 onRegisterSuccess = {
@@ -120,24 +120,22 @@ fun AppNavHost() {
             )
         }
 
-        /* ---------- Forgot Password ---------- */
+
         composable(Routes.FORGOT_PASSWORD) {
             ForgotPasswordScreen(onBack = { nav.popBackStack() })
         }
 
-        /* ---------- Admin Login ---------- */
+        /* ---------- Admin Auth ---------- */
         composable(Routes.ADMIN_AUTH) {
             AdminLoginScreen(
                 onAdminLoginSuccess = {
                     nav.navigate(Routes.ADMIN_HOME) {
                         popUpTo(Routes.ADMIN_AUTH) { inclusive = true }
-                        launchSingleTop = true
                     }
                 },
                 onBackToUserLogin = {
                     nav.navigate(Routes.AUTH) {
                         popUpTo(Routes.ADMIN_AUTH) { inclusive = true }
-                        launchSingleTop = true
                     }
                 },
                 onForgotPassword = { nav.navigate(Routes.FORGOT_PASSWORD) }
@@ -147,109 +145,138 @@ fun AppNavHost() {
         /* ---------- Admin Dashboard ---------- */
         composable(Routes.ADMIN_HOME) {
             AdminDashboardScreen(
-                onShopManagementClick = {},
+                onShopManagementClick = {
+                    nav.navigate(Routes.ADMIN_SHOP_MGMT)
+                },
                 onViewReportClick = {},
                 onLogoutClick = {
                     FirebaseAuth.getInstance().signOut()
-                    nav.navigate(Routes.WELCOME) {
+                    nav.navigate(Routes.ADMIN_AUTH) {
                         popUpTo(Routes.ADMIN_HOME) { inclusive = true }
-                        launchSingleTop = true
                     }
                 }
             )
         }
 
-        /* ---------- Avatar ---------- */
+        /* ---------- Admin: Shop Management (Screen A) ---------- */
+        composable(Routes.ADMIN_SHOP_MGMT) {
+            ShopManagementScreen(
+                onBack = { nav.popBackStack() },
+
+                // ✅ 选中 item -> EDIT
+                onEdit = { itemId ->
+                    nav.navigate("${Routes.ADMIN_SHOP_EDIT}?itemId=$itemId")
+                },
+
+                // ✅ Add New
+                onAddNew = {
+                    nav.navigate(Routes.ADMIN_SHOP_EDIT)
+                }
+            )
+        }
+
+        /* ---------- Admin: Shop Edit (Screen B) ---------- */
+        composable(
+            route = "${Routes.ADMIN_SHOP_EDIT}?itemId={itemId}",
+            arguments = listOf(
+                navArgument("itemId") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }
+            )
+        ) { entry ->
+            val itemId = entry.arguments?.getString("itemId")
+
+            ShopItemEditScreen(
+                itemId = itemId,        // null = Add, not null = Edit
+                onBack = { nav.popBackStack() },
+                onSaved = { nav.popBackStack() },
+                onDeleted = { nav.popBackStack() }
+            )
+        }
+
+        /* ---------- User Flow ---------- */
         composable(Routes.AVATAR) {
             AvatarCreateScreen(
-                onNext = { _: AvatarProfile ->
+                onNext = {
                     nav.navigate(Routes.HOME) {
                         popUpTo(Routes.AVATAR) { inclusive = true }
-                        launchSingleTop = true
                     }
                 }
             )
         }
 
-        /* ---------- Home ---------- */
         composable(Routes.HOME) {
             HomeScreen(
                 currentTab = 0,
-                onOpenShop = { nav.navigateSingleTopTo(Routes.SHOP) },
+                onOpenShop = { nav.navigate(Routes.SHOP) },
                 onLogout = {
                     FirebaseAuth.getInstance().signOut()
                     nav.navigate(Routes.AUTH) {
                         popUpTo(Routes.HOME) { inclusive = true }
-                        launchSingleTop = true
                     }
                 },
-                onNavHome = { nav.navigateSingleTopTo(Routes.HOME) },
-                onNavTasks = { nav.navigateSingleTopTo(Routes.TASKS) },
+                onNavHome = { nav.navigate(Routes.HOME) },
+                onNavTasks = { nav.navigate(Routes.TASKS) },
                 levelVm = levelVm
             )
         }
 
-        /* ---------- Shop ---------- */
         composable(Routes.SHOP) {
             ShopScreen(
                 levelVm = levelVm,
                 onBack = { nav.popBackStack() },
-                onSaveDone = {
-                    nav.navigate(Routes.HOME) {
-                        popUpTo(Routes.HOME) { inclusive = true }
-                        launchSingleTop = true
-                    }
+                onSaveDone = { nav.popBackStack() }
+            )
+        }
+
+        composable(Routes.TASKS) {
+            TaskScreen(
+                onBack = { nav.popBackStack() },
+                onNavHome = { nav.navigate(Routes.HOME) },
+                onNavTasks = {},
+                onOpenRecord = { task ->
+                    nav.navigate("${Routes.TASK_RECORD}/${task.id}")
                 }
             )
         }
 
-        /* ---------- Tasks ---------- */
-        composable(Routes.TASKS) {
-            TaskScreen(
-                onBack = { nav.navigateSingleTopTo(Routes.HOME) },
-                onNavHome = { nav.navigateSingleTopTo(Routes.HOME) },
-                onNavTasks = {},
-                onOpenRecord = { task -> nav.navigate("${Routes.TASK_RECORD}/${task.id}") }
-            )
-        }
-
-        /* ---------- Task Record ---------- */
         composable(
             route = "${Routes.TASK_RECORD}/{taskId}",
             arguments = listOf(navArgument("taskId") { type = NavType.LongType })
         ) { entry ->
             val taskId = entry.arguments!!.getLong("taskId")
             val taskVm: TaskViewModel = viewModel(factory = TaskViewModel.Factory)
-            val tasks by taskVm.tasks.collectAsState()
-            val task = tasks.firstOrNull { it.id == taskId }
+            val task = taskVm.tasks.collectAsState().value.firstOrNull { it.id == taskId }
 
             task?.let {
                 TaskRecordScreen(
                     task = it,
                     onBack = { nav.popBackStack() },
-                    onStartFocus = { focus -> nav.navigate("${Routes.TASK_FOCUS}/${focus.id}") }
+                    onStartFocus = { focus ->
+                        nav.navigate("${Routes.TASK_FOCUS}/${focus.id}")
+                    }
                 )
             }
         }
 
-        /* ---------- Task Focus ---------- */
         composable(
             route = "${Routes.TASK_FOCUS}/{taskId}",
             arguments = listOf(navArgument("taskId") { type = NavType.LongType })
         ) { entry ->
             val taskId = entry.arguments!!.getLong("taskId")
             val taskVm: TaskViewModel = viewModel(factory = TaskViewModel.Factory)
-            val tasks by taskVm.tasks.collectAsState()
-            val task = tasks.firstOrNull { it.id == taskId }
+            val task = taskVm.tasks.collectAsState().value.firstOrNull { it.id == taskId }
 
-            task?.let { t ->
+            task?.let {
                 TaskFocusScreen(
-                    task = t,
+                    task = it,
                     onBack = { nav.popBackStack() },
                     onFinish = { minutes, exp, success ->
                         if (success) {
                             levelVm.grantSessionReward(exp, exp)
-                            taskVm.applyFocusResult(t, minutes)
+                            taskVm.applyFocusResult(it, minutes)
                         }
                         nav.popBackStack()
                     }
@@ -258,6 +285,7 @@ fun AppNavHost() {
         }
     }
 }
+
 
 /* ---------------- Splash Logic (FIXED) ---------------- */
 
