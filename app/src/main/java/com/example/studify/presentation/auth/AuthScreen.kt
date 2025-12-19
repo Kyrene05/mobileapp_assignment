@@ -159,34 +159,38 @@ fun AuthScreen(
                     loading = true
                     scope.launch {
                         try {
-                            // 1) Sign in
+                            // 1) Sign in the user
                             val result = AuthRepository.signIn(input, password)
                             result.onFailure { throw it }
 
-                            // 2) Resolve actual email (if username login, Firebase gives us the email)
-                            val signedInEmail = FirebaseAuth.getInstance().currentUser?.email
-                                ?: input.takeIf { it.contains("@") }
-                                ?: ""
+                            // 2) Get the current User ID immediately after sign-in
+                            val uid = FirebaseAuth.getInstance().currentUser?.uid
 
-                            if (signedInEmail.isBlank()) {
-                                FirebaseAuth.getInstance().signOut()
+                            if (uid == null) {
                                 loading = false
-                                error = "Login failed. Please try again."
+                                error = "Authentication failed."
                                 return@launch
                             }
 
-                            // 3) Block admin accounts from user module
-                            val snap = FirebaseFirestore.getInstance()
+                            // 3) GET THE DOCUMENT DIRECTLY BY UID (Instead of searching by email)
+                            // This avoids the "Permission Denied" query error
+                            val doc = FirebaseFirestore.getInstance()
                                 .collection("users")
-                                .whereEqualTo("email", signedInEmail)
-                                .limit(1)
+                                .document(uid)
                                 .get(Source.SERVER)
                                 .await()
 
-                            val role = snap.documents.firstOrNull()?.getString("role")
+                            if (!doc.exists()) {
+                                loading = false
+                                error = "User profile not found."
+                                return@launch
+                            }
+
+                            val role = doc.getString("role")
 
                             loading = false
 
+                            // 4) Check role
                             if (role == "admin") {
                                 FirebaseAuth.getInstance().signOut()
                                 error = "This is an admin account. Please use Admin Login."

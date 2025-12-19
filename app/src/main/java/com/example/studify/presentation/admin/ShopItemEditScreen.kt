@@ -1,246 +1,247 @@
-@file:OptIn(ExperimentalMaterial3Api::class)
-
 package com.example.studify.presentation.admin
 
-import android.content.Context
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.KeyboardArrowDown
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.studify.ui.theme.Coffee
 import com.example.studify.ui.theme.Cream
 import com.example.studify.ui.theme.Paper
-import com.example.studify.ui.theme.Stone
 import com.google.firebase.firestore.FirebaseFirestore
 
-
 private val IMAGE_KEY_CHOICES = listOf(
+    "acc_gojo",
     "acc_cap",
     "acc_crown",
     "acc_shades",
-    "acc_love",
-    "acc_magichat",
-    "acc_gradcap",
-    "acc_gojo",
     "acc_beanie",
-    "acc_bowtie"
+    "acc_love",
+    "acc_gradcap",
+    "acc_magichat",
+    "acc_bowtie",
+    "acc_tie",
+    "acc_star"
 )
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ShopItemEditScreen(
-    itemId: String?,           // ✅ null = Add New, not null = Edit existing
+    itemId: String?, // Edit: doc.id (e.g. "beanie"). Add: null
     onBack: () -> Unit,
     onSaved: () -> Unit,
     onDeleted: () -> Unit
 ) {
-    val context = LocalContext.current
-    val db = remember { FirebaseFirestore.getInstance() }
+    val db = FirebaseFirestore.getInstance()
 
-    var loading by remember { mutableStateOf(itemId != null) }
-    var error by remember { mutableStateOf<String?>(null) }
-
-    // form states
-    var selectedImageKey by remember { mutableStateOf(IMAGE_KEY_CHOICES.first()) }
+    var expanded by remember { mutableStateOf(false) }
+    var selectedImageKey by remember { mutableStateOf(IMAGE_KEY_CHOICES.firstOrNull() ?: "") }
     var name by remember { mutableStateOf("") }
     var priceText by remember { mutableStateOf("") }
     var available by remember { mutableStateOf(true) }
+    var error by remember { mutableStateOf<String?>(null) }
 
-    // dropdown
-    var expandDropdown by remember { mutableStateOf(false) }
+    val isEdit = !itemId.isNullOrBlank()
+    val primaryLabel = if (isEdit) "UPDATE" else "ADD"
 
-    // Load existing item if edit mode
+    // ----- UI styles (force Coffee/Paper/Cream; no purple) -----
+    val fieldShape = RoundedCornerShape(14.dp)
+
+    val fieldColors = OutlinedTextFieldDefaults.colors(
+        focusedContainerColor = Paper,
+        unfocusedContainerColor = Paper,
+        disabledContainerColor = Paper,
+
+        focusedTextColor = Coffee,
+        unfocusedTextColor = Coffee,
+        disabledTextColor = Coffee.copy(alpha = 0.6f),
+
+        focusedBorderColor = Coffee,
+        unfocusedBorderColor = Coffee.copy(alpha = 0.35f),
+        disabledBorderColor = Coffee.copy(alpha = 0.2f),
+
+        cursorColor = Coffee
+    )
+
+    val switchColors = SwitchDefaults.colors(
+        checkedTrackColor = Coffee,
+        checkedThumbColor = Paper,
+        uncheckedTrackColor = Paper,
+        uncheckedThumbColor = Coffee
+    )
+
     LaunchedEffect(itemId) {
-        if (itemId.isNullOrBlank()) return@LaunchedEffect
-        loading = true
-        error = null
-        try {
-            val doc = db.collection("shop_items").document(itemId).get().awaitCompat()
-            if (!doc.exists()) {
-                error = "Item not found."
-                loading = false
-                return@LaunchedEffect
-            }
-            name = doc.getString("name") ?: ""
-            val p = (doc.getLong("price") ?: 0L).toInt()
-            priceText = p.toString()
-            available = doc.getBoolean("available") ?: true
-            selectedImageKey = doc.getString("imageKey") ?: selectedImageKey
-        } catch (e: Exception) {
-            error = e.message ?: "Failed to load item."
-        } finally {
-            loading = false
+        if (isEdit) {
+            db.collection("shop_items")
+                .document(itemId!!)
+                .get()
+                .addOnSuccessListener { doc ->
+                    if (doc.exists()) {
+                        selectedImageKey = doc.getString("imageKey") ?: selectedImageKey
+                        name = doc.getString("name") ?: ""
+                        priceText = (doc.getLong("price") ?: 0L).toString()
+                        available = doc.getBoolean("available") ?: true
+                    } else {
+                        error = "Item not found."
+                    }
+                }
+                .addOnFailureListener { e ->
+                    error = e.message ?: "Failed to load item."
+                }
+        } else {
+            selectedImageKey = IMAGE_KEY_CHOICES.firstOrNull() ?: ""
+            name = ""
+            priceText = ""
+            available = true
+            error = null
         }
     }
 
     Scaffold(
-        containerColor = Cream,
         topBar = {
             TopAppBar(
-                title = {},
+                title = { },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Cream,
+                    titleContentColor = Coffee,
+                    navigationIconContentColor = Coffee
+                ),
                 navigationIcon = {
                     Text(
                         text = "< Back",
-                        color = Coffee,
-                        fontSize = 25.sp,
-                        fontWeight = FontWeight.Medium,
                         modifier = Modifier
-                            .padding(start = 16.dp)
+                            .padding(horizontal = 16.dp)
                             .clickable { onBack() }
                     )
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Cream)
+                }
             )
-        }
-    ) { innerPadding ->
-
-        if (loading) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator(color = Coffee)
-            }
-            return@Scaffold
-        }
-
+        },
+        containerColor = Cream
+    ) { padding ->
         Column(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(horizontal = 22.dp, vertical = 18.dp),
-            verticalArrangement = Arrangement.Top
+                .padding(padding)
+                .padding(16.dp)
         ) {
-            Text(
-                text = "Item",
-                color = Coffee,
-                fontSize = 44.sp,
-                fontWeight = FontWeight.SemiBold
-            )
-
-            Spacer(Modifier.height(14.dp))
-
-            // ===== Dropdown (ImageKey) =====
-            Box {
-                Surface(
-                    color = Paper,
-                    shape = RoundedCornerShape(14.dp),
+            // ----- Dropdown: imageKey -----
+            ExposedDropdownMenuBox(
+                expanded = expanded,
+                onExpandedChange = { expanded = !expanded }
+            ) {
+                OutlinedTextField(
+                    value = selectedImageKey,
+                    onValueChange = {},
+                    readOnly = true,
+                    shape = fieldShape,
+                    colors = fieldColors,
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(52.dp)
-                        .clickable { expandDropdown = true }
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            text = selectedImageKey,
-                            color = Coffee,
-                            fontSize = 18.sp
-                        )
-                        Icon(
-                            imageVector = Icons.Rounded.KeyboardArrowDown,
-                            contentDescription = "Expand",
-                            tint = Coffee
-                        )
-                    }
-                }
+                        .menuAnchor()
+                        .fillMaxWidth(),
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) }
+                )
 
-                DropdownMenu(
-                    expanded = expandDropdown,
-                    onDismissRequest = { expandDropdown = false },
-                    modifier = Modifier.background(Paper)
+                ExposedDropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false }
                 ) {
                     IMAGE_KEY_CHOICES.forEach { key ->
                         DropdownMenuItem(
                             text = { Text(key, color = Coffee) },
                             onClick = {
                                 selectedImageKey = key
-                                expandDropdown = false
+                                expanded = false
                             }
                         )
                     }
                 }
             }
 
-            Spacer(Modifier.height(18.dp))
+            Spacer(Modifier.height(14.dp))
 
-            // ===== Name =====
-            TextField(
+            // ----- Name field -----
+            OutlinedTextField(
                 value = name,
                 onValueChange = { name = it },
-                placeholder = { Text("Item name", color = Stone) },
                 singleLine = true,
-                shape = RoundedCornerShape(14.dp),
-                colors = textFieldColors(),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp)
+                shape = fieldShape,
+                colors = fieldColors,
+                label = { Text("Name") },          // ✅ show "Name"
+                placeholder = { Text("Name") },    // ✅ hint "Name"
+                modifier = Modifier.fillMaxWidth()
             )
 
             Spacer(Modifier.height(14.dp))
 
-            // ===== Price =====
-            TextField(
+            // ----- Price field -----
+            OutlinedTextField(
                 value = priceText,
-                onValueChange = { input ->
-                    // 只允许数字
-                    priceText = input.filter { it.isDigit() }
-                },
-                placeholder = { Text("Price", color = Stone) },
+                onValueChange = { priceText = it },
                 singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                shape = RoundedCornerShape(14.dp),
-                colors = textFieldColors(),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp)
+                shape = fieldShape,
+                colors = fieldColors,
+                label = { Text("Price") },         // ✅ show "Price"
+                placeholder = { Text("Price") },   // ✅ hint "Price"
+                modifier = Modifier.fillMaxWidth()
             )
 
-            Spacer(Modifier.height(18.dp))
+            Spacer(Modifier.height(14.dp))
 
-            // ===== Available toggle =====
+            // ----- Available -----
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(
-                    text = "Available",
-                    color = Coffee,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Medium
-                )
-                Spacer(Modifier.weight(1f))
+                Text("Available", color = Coffee)
                 Switch(
                     checked = available,
-                    onCheckedChange = { available = it }
+                    onCheckedChange = { available = it },
+                    colors = switchColors
                 )
             }
 
-            Spacer(Modifier.height(26.dp))
+            Spacer(Modifier.height(16.dp))
 
-            // ===== Buttons: ADD/UPDATE + DELETE =====
-            val isEdit = !itemId.isNullOrBlank()
-            val primaryLabel = if (isEdit) "UPDATE" else "ADD"
+            if (error != null) {
+                Text(
+                    text = error!!,
+                    color = MaterialTheme.colorScheme.error,
+                    fontSize = 14.sp
+                )
+                Spacer(Modifier.height(12.dp))
+            }
 
+            // ----- Buttons -----
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
@@ -248,6 +249,7 @@ fun ShopItemEditScreen(
                 Button(
                     onClick = {
                         error = null
+
                         val finalName = name.trim()
                         val finalPrice = priceText.toIntOrNull()
 
@@ -259,8 +261,11 @@ fun ShopItemEditScreen(
                             error = "Price must be a number."
                             return@Button
                         }
+                        if (selectedImageKey.isBlank()) {
+                            error = "Please select an imageKey."
+                            return@Button
+                        }
 
-                        // Save
                         val data = hashMapOf(
                             "name" to finalName,
                             "price" to finalPrice,
@@ -277,15 +282,25 @@ fun ShopItemEditScreen(
                                     error = e.message ?: "Failed to update item."
                                 }
                         } else {
-                            // ✅ 新增：用 imageKey 做 docId 会比较好（可避免重复）
-                            // 但如果你想让 firebase 自动 id，可以改成 add(data)
-                            val newId = selectedImageKey.removePrefix("acc_") // e.g. cap/crown
-                            db.collection("shop_items")
-                                .document(newId)
-                                .set(data)
-                                .addOnSuccessListener { onSaved() }
+                            // Firestore doc.id is WITHOUT "acc_"
+                            val newId = selectedImageKey.removePrefix("acc_")
+                            val docRef = db.collection("shop_items").document(newId)
+
+                            docRef.get()
+                                .addOnSuccessListener { snap ->
+                                    if (snap.exists()) {
+                                        error = "This item already exists. Please use UPDATE instead."
+                                        return@addOnSuccessListener
+                                    }
+
+                                    docRef.set(data)
+                                        .addOnSuccessListener { onSaved() }
+                                        .addOnFailureListener { e ->
+                                            error = e.message ?: "Failed to add item."
+                                        }
+                                }
                                 .addOnFailureListener { e ->
-                                    error = e.message ?: "Failed to add item."
+                                    error = e.message ?: "Failed to verify item existence."
                                 }
                         }
                     },
@@ -301,65 +316,32 @@ fun ShopItemEditScreen(
                     Text(primaryLabel, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
                 }
 
-                Button(
-                    onClick = {
-                        error = null
-                        if (!isEdit) {
-                            // 新增模式没得删
-                            error = "Nothing to delete (Add mode)."
-                            return@Button
-                        }
-                        db.collection("shop_items")
-                            .document(itemId!!)
-                            .delete()
-                            .addOnSuccessListener { onDeleted() }
-                            .addOnFailureListener { e ->
-                                error = e.message ?: "Failed to delete item."
-                            }
-                    },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFFE1E1DB),
-                        contentColor = Coffee
-                    ),
-                    shape = RoundedCornerShape(14.dp),
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(56.dp)
-                ) {
-                    Text("DELETE", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
+                // DELETE only in edit mode
+                if (isEdit) {
+                    Button(
+                        onClick = {
+                            error = null
+                            db.collection("shop_items")
+                                .document(itemId!!)
+                                .delete()
+                                .addOnSuccessListener { onDeleted() }
+                                .addOnFailureListener { e ->
+                                    error = e.message ?: "Failed to delete item."
+                                }
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Paper,
+                            contentColor = Coffee
+                        ),
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(56.dp)
+                    ) {
+                        Text("DELETE", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
+                    }
                 }
             }
-
-            if (error != null) {
-                Spacer(Modifier.height(14.dp))
-                Text(error!!, color = MaterialTheme.colorScheme.error)
-            }
         }
-    }
-}
-
-/**
- * M3 TextField color helper (keep your theme look)
- */
-@Composable
-private fun textFieldColors() = TextFieldDefaults.colors(
-    focusedContainerColor = Paper,
-    unfocusedContainerColor = Paper,
-    disabledContainerColor = Paper,
-    focusedIndicatorColor = Color.Transparent,
-    unfocusedIndicatorColor = Color.Transparent,
-    cursorColor = Coffee,
-    focusedTextColor = Coffee,
-    unfocusedTextColor = Coffee
-)
-
-/**
- * Small await helper without adding kotlinx-coroutines-play-services import requirement in this file.
- * If you already use `kotlinx.coroutines.tasks.await`, you can delete this and use await() directly.
- */
-private suspend fun <T> com.google.android.gms.tasks.Task<T>.awaitCompat(): T {
-    return kotlinx.coroutines.suspendCancellableCoroutine { cont ->
-        addOnSuccessListener { cont.resume(it) {} }
-        addOnFailureListener { cont.resumeWith(Result.failure(it)) }
     }
 }

@@ -18,13 +18,34 @@ import androidx.compose.ui.unit.dp
 import com.example.studify.ui.theme.Banana
 import com.example.studify.ui.theme.Coffee
 import com.example.studify.ui.theme.Cream
+import android.util.Log
+import androidx.compose.runtime.LaunchedEffect
+import com.google.android.gms.tasks.OnFailureListener
+import com.google.android.gms.tasks.OnSuccessListener
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.GetTokenResult
+
 
 @Composable
 fun AdminDashboardScreen(
+
     onShopManagementClick: () -> Unit,
     onViewReportClick: () -> Unit,
     onLogoutClick: () -> Unit
 ) {
+    //check admin claim when this screen enters
+    LaunchedEffect(Unit) {
+        val user = FirebaseAuth.getInstance().currentUser
+        user?.getIdToken(true)
+            ?.addOnSuccessListener { result ->
+                val isAdmin = result.claims["admin"] == true
+                Log.d("ADMIN", "admin claim = $isAdmin")
+            }
+            ?.addOnFailureListener { e ->
+                Log.e("ADMIN", "token refresh failed", e)
+            }
+    }
+
     val backgroundColor = Cream
     val cardColor = Banana
     val textColor = Coffee

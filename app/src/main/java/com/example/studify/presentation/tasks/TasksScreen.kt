@@ -246,7 +246,7 @@ private fun TaskItemSlim(
                         text = "Total: ${task.totalFocusMinutes} mins · ${task.focusSessions} sessions\n" +
                                 "Last: ${task.lastFocusMinutes} mins ($lastStatus)",
                         style = MaterialTheme.typography.bodySmall,
-                        color = Banana.copy(alpha = 1.5f)
+                        color = Coffee.copy(alpha = 1.5f)
                     )
                 }
             }

@@ -26,28 +26,29 @@ object AuthRepository {
     }
 
     /**
-     * Sign in with email OR username (username will be resolved to email via Firestore).
-     */
+    * UPDATED: Sign in with email OR username.
+    */
     suspend fun signIn(emailOrUsername: String, password: String): Result<Unit> = runCatching {
         val login = emailOrUsername.trim()
-        val email = if (login.contains("@")) {
-            login
+
+        // 1. If it's an email, sign in immediately to get 'auth' context
+        if (login.contains("@")) {
+            auth.signInWithEmailAndPassword(login, password).await()
         } else {
+            // 2. If it's a username, we must use a 'Service Account' logic or
+            // temporary permissive rules to find the email first
             val snap = db.collection("users")
                 .whereEqualTo("username", login)
                 .limit(1)
-                .get()
+                .get(Source.SERVER)
                 .await()
 
             val doc = snap.documents.firstOrNull()
                 ?: throw IllegalArgumentException("Username not found.")
 
-            (doc.getString("email") ?: "").ifEmpty {
-                throw IllegalStateException("Email not found for this username.")
-            }
+            val email = doc.getString("email") ?: throw IllegalStateException("Email missing.")
+            auth.signInWithEmailAndPassword(email, password).await()
         }
-
-        auth.signInWithEmailAndPassword(email, password).await()
     }
 
     /**
@@ -69,8 +70,7 @@ object AuthRepository {
     }
 
     /**
-     * Create user; set displayName=username; save to Firestore users/{uid}
-     * Also sets default role = "user".
+     * UPDATED: Create user and profile.
      */
     suspend fun register(
         email: String,
@@ -80,7 +80,11 @@ object AuthRepository {
         val trimmedEmail = email.trim()
         val trimmedUser = username.trim()
 
-        // Ensure username unique
+        // 1. Create Auth User FIRST. This makes request.auth != null
+        val authResult = auth.createUserWithEmailAndPassword(trimmedEmail, password).await()
+        val user = authResult.user ?: error("User creation failed.")
+
+        // 2. Now that we are signed in, check if username is unique
         val exists = db.collection("users")
             .whereEqualTo("username", trimmedUser)
             .limit(1)
@@ -89,26 +93,20 @@ object AuthRepository {
             .isEmpty
             .not()
 
-        if (exists) error("Username is already taken.")
+        if (exists) {
+            // If username exists, delete the auth user we just made and throw error
+            user.delete().await()
+            error("Username is already taken.")
+        }
 
-        // 1) create Auth user
-        val user = auth.createUserWithEmailAndPassword(trimmedEmail, password).await().user
-            ?: error("User is null after createUser")
-
-        // 2) set Firebase Auth profile displayName = username
-        val req = UserProfileChangeRequest.Builder()
-            .setDisplayName(trimmedUser)
-            .build()
-        user.updateProfile(req).await()
-
-        // 3) write profile to Firestore
+        // 3. Write profile to Firestore users/{uid}
         val payload = RegisterPayload(uid = user.uid, email = trimmedEmail, username = trimmedUser)
 
         db.collection("users").document(user.uid).set(
             mapOf(
                 "email" to trimmedEmail,
                 "username" to trimmedUser,
-                "role" to "user",          // ✅ default role
+                "role" to "user",
                 "createdAt" to Timestamp.now()
             )
         ).await()

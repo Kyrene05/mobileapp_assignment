@@ -22,6 +22,7 @@ import com.example.studify.presentation.avatar.AvatarProfile
 import com.example.studify.presentation.avatar.ShopScreen
 import com.example.studify.presentation.home.HomeScreen
 import com.example.studify.presentation.home.LevelViewModel
+import com.example.studify.presentation.report.ReportScreen
 import com.example.studify.presentation.tasks.*
 import com.example.studify.presentation.welcome.WelcomeScreen
 import com.google.firebase.auth.FirebaseAuth
@@ -51,6 +52,9 @@ object Routes {
     const val ADMIN_HOME = "admin_home"
     const val ADMIN_SHOP_MGMT = "admin_shop_mgmt"
     const val ADMIN_SHOP_EDIT = "admin_shop_edit"
+
+    //report
+    const val ADMIN_REPORT="admin_report"
 }
 
 /* ---------------- Helper ---------------- */
@@ -148,7 +152,9 @@ fun AppNavHost() {
                 onShopManagementClick = {
                     nav.navigate(Routes.ADMIN_SHOP_MGMT)
                 },
-                onViewReportClick = {},
+                onViewReportClick = {
+                    nav.navigate(Routes.ADMIN_REPORT)
+                },
                 onLogoutClick = {
                     FirebaseAuth.getInstance().signOut()
                     nav.navigate(Routes.ADMIN_AUTH) {
@@ -163,7 +169,7 @@ fun AppNavHost() {
             ShopManagementScreen(
                 onBack = { nav.popBackStack() },
 
-                // ✅ 选中 item -> EDIT
+
                 onEdit = { itemId ->
                     nav.navigate("${Routes.ADMIN_SHOP_EDIT}?itemId=$itemId")
                 },
@@ -195,6 +201,15 @@ fun AppNavHost() {
                 onDeleted = { nav.popBackStack() }
             )
         }
+        /* ---------- Admin: Report ---------- */
+        composable(Routes.ADMIN_REPORT) {
+            ReportScreen(
+                onBackClick = {
+                    nav.popBackStack()
+                }
+            )
+        }
+
 
         /* ---------- User Flow ---------- */
         composable(Routes.AVATAR) {
@@ -296,56 +311,49 @@ private fun SplashGate(nav: NavController) {
     LaunchedEffect(Unit) {
         val auth = FirebaseAuth.getInstance()
         val user = auth.currentUser
+        val db = FirebaseFirestore.getInstance()
 
         val prefs = context.getSharedPreferences("studify_prefs", Context.MODE_PRIVATE)
         val hasSeenWelcome = prefs.getBoolean("hasSeenWelcome", false)
 
         if (user == null) {
+
             nav.navigate(if (hasSeenWelcome) Routes.AUTH else Routes.WELCOME) {
                 popUpTo(Routes.SPLASH) { inclusive = true }
-                launchSingleTop = true
             }
             prefs.edit().putBoolean("hasSeenWelcome", true).apply()
-            return@LaunchedEffect
-        }
+        } else {
 
-        // ✅ NEW: role check
-        val role = try {
-            FirebaseFirestore.getInstance()
-                .collection("users")
-                .document(user.uid)
-                .get(Source.SERVER)
-                .await()
-                .getString("role")
-        } catch (_: Exception) {
-            null
-        }
+            try {
 
-        if (role == "admin") {
-            nav.navigate(Routes.ADMIN_HOME) {
-                popUpTo(Routes.SPLASH) { inclusive = true }
-                launchSingleTop = true
+                val avatarDoc = db.collection("users")
+                    .document(user.uid)
+                    .collection("avatar")
+                    .document("profile")
+                    .get(com.google.firebase.firestore.Source.DEFAULT)
+                    .await()
+
+                if (avatarDoc.exists()) {
+
+                    nav.navigate(Routes.HOME) {
+                        popUpTo(Routes.SPLASH) { inclusive = true }
+                    }
+                } else {
+
+                    nav.navigate(Routes.AVATAR) {
+                        popUpTo(Routes.SPLASH) { inclusive = true }
+                    }
+                }
+            } catch (e: Exception) {
+
+                nav.navigate(Routes.HOME) {
+                    popUpTo(Routes.SPLASH) { inclusive = true }
+                }
             }
-            return@LaunchedEffect
-        }
-
-        // Normal user flow: avatar gate
-        val hasAvatar = try {
-            FirebaseFirestore.getInstance()
-                .collection("users").document(user.uid)
-                .collection("avatar").document("profile")
-                .get(Source.SERVER)
-                .await()
-                .exists()
-        } catch (_: Exception) { false }
-
-        nav.navigate(if (hasAvatar) Routes.HOME else Routes.AVATAR) {
-            popUpTo(Routes.SPLASH) { inclusive = true }
-            launchSingleTop = true
         }
     }
 
-    Surface(modifier = Modifier.fillMaxSize()) {
-        Column { Text("") }
+    Surface(modifier = Modifier.fillMaxSize(), color = com.example.studify.ui.theme.Cream) {
+
     }
 }

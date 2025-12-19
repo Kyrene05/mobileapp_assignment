@@ -82,6 +82,14 @@ private val ACCESSORY_SPECS: Map<String, AccessorySpec> = mapOf(
     "bowtie" to AccessorySpec(
         resId = R.drawable.acc_bowtie,
         scale = 0.40f, anchorX = 0.50f, anchorY = 0.62f
+    ),
+    "tie" to AccessorySpec(
+        resId = R.drawable.acc_tie,
+        scale = 0.40f, anchorX = 0.50f, anchorY = 0.66f
+    ),
+    "star" to AccessorySpec(
+        resId = R.drawable.acc_star,
+        scale = 0.55f, anchorX = 0.50f, anchorY = 0.66f
     )
 )
 
@@ -117,9 +125,10 @@ private fun AccessoryLayer(
     id: String,
     baseSize: Dp,
 ) {
-    val spec = ACCESSORY_SPECS[id] ?: return
-    val density = LocalDensity.current
+    val normalized = id.removePrefix("acc_")
+    val spec = ACCESSORY_SPECS[id] ?: ACCESSORY_SPECS[normalized] ?: return
 
+    val density = LocalDensity.current
     val basePx = with(density) { baseSize.toPx() }
     val anchorXpx = spec.anchorX * basePx
     val anchorYpx = spec.anchorY * basePx
@@ -137,6 +146,7 @@ private fun AccessoryLayer(
         }
     )
 }
+
 
 /* ---------- Avatar preview composable ---------- */
 
@@ -191,7 +201,7 @@ private fun PreviewAvatarPinkHat() {
         AvatarPreview(
             profile = AvatarProfile(
                 baseColor = "pink",
-                accessories = listOf("hat")
+                accessories = listOf("star")
             ),
             modifier = Modifier.size(260.dp)
         )
