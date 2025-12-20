@@ -28,6 +28,17 @@ object AvatarRepository {
         Log.d(TAG, "✅ Avatar saved successfully")
     }
 
+    suspend fun checkUserRole(uid: String): String {
+        return try {
+            val doc = FirebaseFirestore.getInstance()
+                .collection("users")
+                .document(uid)
+                .get().await()
+            doc.getString("role") ?: "user" // Default to user if field is missing
+        } catch (e: Exception) {
+            "user"
+        }
+    }
 
     suspend fun load(uid: String): Result<AvatarProfile> = runCatching {
         val snap = avatarDoc(uid).get().await()

@@ -46,9 +46,10 @@ fun HomeScreen(
     val scope = rememberCoroutineScope()
 
     // --------- Top up dialog states ---------
-    var showTopUpDialog by remember { mutableStateOf(false) }          // 选套餐
-    var showPaymentDialog by remember { mutableStateOf(false) }        // 选付款方式
-    var showTopUpResultDialog by remember { mutableStateOf(false) }    // Demo 提示
+    var showTopUpDialog by remember { mutableStateOf(false) }
+    var showLogoutConfirmation by remember { mutableStateOf(false) }
+    var showPaymentDialog by remember { mutableStateOf(false) }
+    var showTopUpResultDialog by remember { mutableStateOf(false) }
 
     var selectedPackageId by remember { mutableStateOf<Int?>(null) }
     var selectedPackageLabel by remember { mutableStateOf("") }
@@ -69,7 +70,7 @@ fun HomeScreen(
         )
     }
 
-    // 加载 avatar
+    //  avatar
     LaunchedEffect(Unit) {
         FirebaseAuth.getInstance().currentUser?.uid?.let { uid ->
             scope.launch {
@@ -101,12 +102,13 @@ fun HomeScreen(
             )
         }
     ) { innerPadding ->
-        Box(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            // 背景
+            val isLandscape = maxWidth > maxHeight
+
             Image(
                 painter = painterResource(id = R.drawable.bg_home),
                 contentDescription = null,
@@ -114,89 +116,90 @@ fun HomeScreen(
                 modifier = Modifier.fillMaxSize()
             )
 
-            val barWidth = 260.dp
-            val iconSize = 30.dp
-            val gap = 20.dp
-            val barUsable = barWidth - iconSize - gap
-
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Spacer(Modifier.height(24.dp))
-
-                // 顶部：Level + Logout
+            if (isLandscape) {
+                // --- LANDSCAPE: Side-by-Side ---
                 Row(
-                    modifier = Modifier.requiredWidth(barWidth),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    LevelBar(
-                        level = level,
-                        xp = xp,
-                        nextLevelXp = nextLevelXp,
-                        width = barUsable
-                    )
-                    Spacer(Modifier.width(gap))
-                    IconButton(onClick = onLogout) {
-                        Icon(
-                            imageVector = Icons.Filled.Logout,
-                            contentDescription = "Logout",
-                            tint = Coffee
-                        )
-                    }
-                }
-
-                // Coins + 「+」
-                Spacer(Modifier.height(6.dp))
-                Row(
-                    modifier = Modifier.requiredWidth(barWidth),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Spacer(Modifier.width(2.dp))
-
-                    Text(
-                        text = "\uD83D\uDCB0 $coins",
-                        color = Coffee,
-                        style = MaterialTheme.typography.bodyLarge
-                    )
-
-                    Spacer(Modifier.width(8.dp))
-
-                    IconButton(
-                        onClick = {
-                            selectedPackageId = null
-                            selectedPaymentMethod = "Online Banking / FPX"
-                            showTopUpDialog = true
-                        },
-                        modifier = Modifier.size(30.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Add,
-                            contentDescription = "Top up coins",
-                            tint = Coffee
-                        )
-                    }
-                }
-
-                // Avatar
-                Spacer(Modifier.height(230.dp))
-                Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                    contentAlignment = Alignment.Center
+                        .fillMaxSize()
+                        .padding(24.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    AvatarPreview(
-                        profile = avatar,
-                        modifier = Modifier.size(260.dp)
-                    )
+                    // Left side: Stats
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        horizontalAlignment = Alignment.Start
+                    ) {
+                        LevelBar(level = level, xp = xp, nextLevelXp = nextLevelXp, width = 260.dp)
+                        Spacer(Modifier.height(12.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("💰 $coins", color = Coffee, style = MaterialTheme.typography.bodyLarge)
+                            Spacer(Modifier.width(8.dp))
+                            IconButton(onClick = { showTopUpDialog = true }) {
+                                Icon(Icons.Filled.Add, "Top up", tint = Coffee)
+                            }
+                            Spacer(Modifier.width(16.dp))
+                            IconButton(onClick = { showLogoutConfirmation = true }) {
+                                Icon(Icons.Filled.Logout, "Logout", tint = Coffee)
+                            }
+                        }
+                    }
+
+                    // Right side: Avatar
+                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                        AvatarPreview(profile = avatar, modifier = Modifier.size(220.dp))
+                    }
+                }
+            } else {
+                // --- PORTRAIT: Original Vertical Layout ---
+                Column(
+                    modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Spacer(Modifier.height(24.dp))
+                    Row(modifier = Modifier.width(260.dp), verticalAlignment = Alignment.CenterVertically) {
+                        LevelBar(level = level, xp = xp, nextLevelXp = nextLevelXp, width = 210.dp)
+                        Spacer(Modifier.width(20.dp))
+                        IconButton(onClick = { showLogoutConfirmation = true }) {
+                            Icon(Icons.Filled.Logout, "Logout", tint = Coffee)
+                        }
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    Row(modifier = Modifier.width(260.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("💰 $coins", color = Coffee, style = MaterialTheme.typography.bodyLarge)
+                        IconButton(onClick = { showTopUpDialog = true }) {
+                            Icon(Icons.Filled.Add, "Top up", tint = Coffee)
+                        }
+                    }
+                    Spacer(Modifier.height(230.dp)) // This is the spacer that breaks landscape
+                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                        AvatarPreview(profile = avatar, modifier = Modifier.size(260.dp))
+                    }
                 }
             }
         }
     }
-
+    // ================== Confirmation message ==================
+    if (showLogoutConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showLogoutConfirmation = false },
+            containerColor = Cream,
+            title = { Text("Logout", color = Coffee) },
+            text = { Text("Are you sure you want to log out?", color = Stone) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showLogoutConfirmation = false
+                    onLogout() // Execute actual logout
+                }) {
+                    Text("Logout", color = Coffee)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLogoutConfirmation = false }) {
+                    Text("Cancel", color = Coffee.copy(alpha = 0.6f))
+                }
+            }
+        )
+    }
     // ================== Dialog 1：choose package ==================
     if (showTopUpDialog) {
         AlertDialog(

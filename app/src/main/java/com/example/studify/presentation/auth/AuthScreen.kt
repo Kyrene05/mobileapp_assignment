@@ -30,6 +30,9 @@ import com.example.studify.ui.theme.*
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Source
+import com.google.firebase.FirebaseNetworkException
+import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
+import com.google.firebase.auth.FirebaseAuthInvalidUserException
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
@@ -157,7 +160,7 @@ fun AuthScreen(
                     }
 
                     loading = true
-                    scope.launch {
+                    val launch = scope.launch {
                         try {
                             // 1) Sign in the user
                             val result = AuthRepository.signIn(input, password)
@@ -199,7 +202,18 @@ fun AuthScreen(
                             }
                         } catch (e: Exception) {
                             loading = false
-                            error = AuthRepository.signInErrorMessage(e)
+                            error = when (e) {
+                                is FirebaseAuthInvalidUserException ->
+                                    "No account found with this email."
+
+                                is FirebaseAuthInvalidCredentialsException ->
+                                    "Wrong password. Please try again."
+
+                                is FirebaseNetworkException ->
+                                    "No internet connection. Please check your network."
+
+                                else -> "Login failed. Please check your credentials."
+                            }
                         }
                     }
                 },

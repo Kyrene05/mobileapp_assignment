@@ -9,6 +9,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -42,10 +43,11 @@ fun TaskFocusScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
 
     val totalSeconds = task.minutes * 60
-    var remainingSeconds by remember(task.id) { mutableStateOf(totalSeconds) }
-    var isRunning by remember(task.id) { mutableStateOf(true) }
-    var isFinished by remember(task.id) { mutableStateOf(false) }
-    var showFinishDialog by remember { mutableStateOf(false) }
+    // Use rememberSaveable so it persists through rotation
+    var remainingSeconds by rememberSaveable(task.id) { mutableIntStateOf(totalSeconds) }
+    var isRunning by rememberSaveable(task.id) { mutableStateOf(true) }
+    var isFinished by rememberSaveable(task.id) { mutableStateOf(false) }
+    var showFinishDialog by rememberSaveable { mutableStateOf(false) }
 
     val progress by animateFloatAsState(
         targetValue = 1f - remainingSeconds / totalSeconds.toFloat(),
@@ -53,39 +55,28 @@ fun TaskFocusScreen(
         label = "progress"
     )
 
-    // Pause when app goes to background, resume when back to foreground.
+    // RESTORED: Pause when app goes to background
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_START -> {
-                    if (!isFinished) {
-                        isRunning = true
-                    }
-                }
-
-                Lifecycle.Event.ON_STOP -> {
-                    isRunning = false
-                }
-
+                Lifecycle.Event.ON_START -> if (!isFinished) isRunning = true
+                Lifecycle.Event.ON_STOP -> isRunning = false
                 else -> {}
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose {
-            lifecycleOwner.lifecycle.removeObserver(observer)
-        }
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    // Timer logic
+    // RESTORED: This is the actual engine that runs the timer
     LaunchedEffect(isRunning, isFinished) {
         if (!isRunning || isFinished) return@LaunchedEffect
 
         while (remainingSeconds > 0 && isRunning) {
             delay(1000L)
-            remainingSeconds--
+            remainingSeconds-- // This updates the UI every second
         }
 
-        // Countdown finished automatically, show dialog to confirm.
         if (remainingSeconds <= 0 && !isFinished) {
             isRunning = false
             isFinished = true
@@ -111,99 +102,71 @@ fun TaskFocusScreen(
         containerColor = Cream,
         contentWindowInsets = WindowInsets(0.dp)
     ) { innerPadding ->
-        Box(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .align(Alignment.TopCenter)
-                    .padding(top = 55.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Surface(
-                    shape = MaterialTheme.shapes.large,
-                    tonalElevation = 4.dp,
-                    color = Banana.copy(alpha = 0.95f),
-                    modifier = Modifier
-                        .fillMaxWidth(0.80f)
-                        .heightIn(min = 100.dp)
+            val isLandscape = maxWidth > maxHeight
+
+            if (isLandscape) {
+                // Horizontal Layout: Prevent overlap
+                Row(
+                    modifier = Modifier.fillMaxSize().padding(24.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                        TaskInfoCard(task)
+                    }
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = task.title,
-                                style = MaterialTheme.typography.titleMedium,
-                                color = Coffee
-                            )
-                            Spacer(Modifier.height(4.dp))
-                            Text(
-                                text = "Focus ${task.minutes} min gain ${task.coins} coins",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = Coffee.copy(alpha = 0.8f)
-                            )
-                            Text(
-                                text = "Reward: ${task.minutes * 10} XP",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = Coffee.copy(alpha = 0.8f)
-                            )
-                        }
+                        CircularTimer(progress, timeText, statusText, Modifier.size(200.dp))
+                        Spacer(Modifier.height(16.dp))
+                        FocusControls(
+                            isRunning = isRunning,
+                            isFinished = isFinished,
+                            onToggle = { isRunning = !isRunning },
+                            onStop = {
+                                if (!isFinished) {
+                                    isRunning = false
+                                    showFinishDialog = true
+                                }
+                            }
+                        )
                     }
                 }
-            }
-
-            Column(
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-
-                CircularTimer(
-                    progress = progress,
-                    timeText = timeText,
-                    statusText = statusText,
-                    modifier = Modifier.fillMaxWidth(0.75f)
-                )
-
-                Spacer(Modifier.height(24.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                    verticalAlignment = Alignment.CenterVertically
+            } else {
+                // Vertical Layout: Original design
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // Stop: pause and show confirm dialog
-                    IconButton(
-                        onClick = {
+                    Spacer(Modifier.height(55.dp))
+                    TaskInfoCard(task, Modifier.fillMaxWidth(0.80f))
+                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                        CircularTimer(progress, timeText, statusText, Modifier.fillMaxWidth(0.75f))
+                    }
+                    FocusControls(
+                        isRunning = isRunning,
+                        isFinished = isFinished,
+                        onToggle = { isRunning = !isRunning },
+                        onStop = {
                             if (!isFinished) {
                                 isRunning = false
                                 showFinishDialog = true
                             }
                         }
-                    ) {
-                        Text("■", color = Coffee)
-                    }
-
-                    // Pause / Resume
-                    IconButton(onClick = {
-                        if (!isFinished) {
-                            isRunning = !isRunning
-                        }
-                    }) {
-                        Text(if (isRunning) "Ⅱ" else "▶", color = Coffee)
-                    }
+                    )
+                    Spacer(Modifier.height(40.dp))
                 }
             }
         }
     }
+
 
     if (showFinishDialog) {
         val sessionEnded = remainingSeconds <= 0
@@ -247,6 +210,49 @@ fun TaskFocusScreen(
                 }
             }
         )
+    }
+}
+// Helper component for the Task Details
+@Composable
+private fun TaskInfoCard(task: Task, modifier: Modifier = Modifier) {
+    Surface(
+        shape = MaterialTheme.shapes.large,
+        tonalElevation = 4.dp,
+        color = Banana.copy(alpha = 0.95f),
+        modifier = modifier.heightIn(min = 100.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(text = task.title, style = MaterialTheme.typography.titleMedium, color = Coffee)
+            Spacer(Modifier.height(4.dp))
+            Text(text = "Focus ${task.minutes} min gain ${task.coins} coins", style = MaterialTheme.typography.bodySmall, color = Coffee.copy(alpha = 0.8f))
+            Text(text = "Reward: ${task.minutes * 10} XP", style = MaterialTheme.typography.bodySmall, color = Coffee.copy(alpha = 0.8f))
+        }
+    }
+}
+
+// Helper component for Pause/Stop buttons
+@Composable
+private fun FocusControls(
+    isRunning: Boolean,
+    isFinished: Boolean,
+    onToggle: () -> Unit,
+    onStop: () -> Unit
+) {
+    Row(
+        modifier = Modifier.padding(bottom = 24.dp),
+        horizontalArrangement = Arrangement.spacedBy(48.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconButton(onClick = onStop) {
+            Text("■", color = Coffee, style = MaterialTheme.typography.headlineSmall)
+        }
+        IconButton(onClick = onToggle) {
+            Text(
+                text = if (isRunning) "Ⅱ" else "▶",
+                color = Coffee,
+                style = MaterialTheme.typography.headlineSmall
+            )
+        }
     }
 }
 

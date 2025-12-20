@@ -55,6 +55,7 @@ object Routes {
 
     //report
     const val ADMIN_REPORT="admin_report"
+
 }
 
 /* ---------------- Helper ---------------- */
@@ -251,6 +252,8 @@ fun AppNavHost() {
                 onBack = { nav.popBackStack() },
                 onNavHome = { nav.navigate(Routes.HOME) },
                 onNavTasks = {},
+                // Pass the shop navigation logic here
+                onOpenShop = { nav.navigate(Routes.SHOP) },
                 onOpenRecord = { task ->
                     nav.navigate("${Routes.TASK_RECORD}/${task.id}")
                 }
@@ -317,35 +320,46 @@ private fun SplashGate(nav: NavController) {
         val hasSeenWelcome = prefs.getBoolean("hasSeenWelcome", false)
 
         if (user == null) {
-
             nav.navigate(if (hasSeenWelcome) Routes.AUTH else Routes.WELCOME) {
                 popUpTo(Routes.SPLASH) { inclusive = true }
             }
             prefs.edit().putBoolean("hasSeenWelcome", true).apply()
         } else {
-
             try {
-
-                val avatarDoc = db.collection("users")
+                // 1. First, check the user's role in the main users collection
+                val userDoc = db.collection("users")
                     .document(user.uid)
-                    .collection("avatar")
-                    .document("profile")
-                    .get(com.google.firebase.firestore.Source.DEFAULT)
+                    .get()
                     .await()
 
-                if (avatarDoc.exists()) {
+                val role = userDoc.getString("role") ?: "user"
 
-                    nav.navigate(Routes.HOME) {
+                // 2. If the user is an Admin, send them directly to the Dashboard
+                if (role == "admin") {
+                    nav.navigate(Routes.ADMIN_HOME) { // Ensure this route matches your NavHost
                         popUpTo(Routes.SPLASH) { inclusive = true }
                     }
                 } else {
+                    // 3. For regular users, check if they have finished their avatar setup
+                    val avatarDoc = db.collection("users")
+                        .document(user.uid)
+                        .collection("avatar")
+                        .document("profile")
+                        .get()
+                        .await()
 
-                    nav.navigate(Routes.AVATAR) {
-                        popUpTo(Routes.SPLASH) { inclusive = true }
+                    if (avatarDoc.exists()) {
+                        nav.navigate(Routes.HOME) {
+                            popUpTo(Routes.SPLASH) { inclusive = true }
+                        }
+                    } else {
+                        nav.navigate(Routes.AVATAR) {
+                            popUpTo(Routes.SPLASH) { inclusive = true }
+                        }
                     }
                 }
             } catch (e: Exception) {
-
+                // On error, default to HOME to avoid getting stuck on Splash
                 nav.navigate(Routes.HOME) {
                     popUpTo(Routes.SPLASH) { inclusive = true }
                 }

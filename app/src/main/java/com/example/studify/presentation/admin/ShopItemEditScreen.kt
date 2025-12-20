@@ -5,10 +5,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenuItem
@@ -63,12 +66,11 @@ fun ShopItemEditScreen(
     onDeleted: () -> Unit
 ) {
     val db = FirebaseFirestore.getInstance()
-
+    val scrollState = rememberScrollState()
     var expanded by remember { mutableStateOf(false) }
     var selectedImageKey by remember { mutableStateOf(IMAGE_KEY_CHOICES.firstOrNull() ?: "") }
     var name by remember { mutableStateOf("") }
     var priceText by remember { mutableStateOf("") }
-    var available by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
 
     val isEdit = !itemId.isNullOrBlank()
@@ -110,7 +112,6 @@ fun ShopItemEditScreen(
                         selectedImageKey = doc.getString("imageKey") ?: selectedImageKey
                         name = doc.getString("name") ?: ""
                         priceText = (doc.getLong("price") ?: 0L).toString()
-                        available = doc.getBoolean("available") ?: true
                     } else {
                         error = "Item not found."
                     }
@@ -122,7 +123,6 @@ fun ShopItemEditScreen(
             selectedImageKey = IMAGE_KEY_CHOICES.firstOrNull() ?: ""
             name = ""
             priceText = ""
-            available = true
             error = null
         }
     }
@@ -151,37 +151,54 @@ fun ShopItemEditScreen(
         Column(
             modifier = Modifier
                 .padding(padding)
+                .fillMaxSize()
+                .verticalScroll(scrollState)
                 .padding(16.dp)
-        ) {
+        ){
+
             // ----- Dropdown: imageKey -----
             ExposedDropdownMenuBox(
-                expanded = expanded,
-                onExpandedChange = { expanded = !expanded }
+                expanded = if (isEdit) false else expanded, // Force closed if editing
+                onExpandedChange = {
+                    // Only allow toggling the menu if we are ADDING, not EDITING
+                    if (!isEdit) expanded = !expanded
+                }
             ) {
                 OutlinedTextField(
                     value = selectedImageKey,
                     onValueChange = {},
                     readOnly = true,
+                    // When editing, the field looks "locked" (slightly greyed out)
+                    enabled = !isEdit,
                     shape = fieldShape,
                     colors = fieldColors,
                     modifier = Modifier
                         .menuAnchor()
                         .fillMaxWidth(),
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) }
+                    label = { Text("Image Key") },
+                    trailingIcon = {
+                        // Only show the dropdown arrow if we are allowed to change it
+                        if (!isEdit) {
+                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
+                        }
+                    }
                 )
 
-                ExposedDropdownMenu(
-                    expanded = expanded,
-                    onDismissRequest = { expanded = false }
-                ) {
-                    IMAGE_KEY_CHOICES.forEach { key ->
-                        DropdownMenuItem(
-                            text = { Text(key, color = Coffee) },
-                            onClick = {
-                                selectedImageKey = key
-                                expanded = false
-                            }
-                        )
+                // Only define the menu content if we are in Add mode
+                if (!isEdit) {
+                    ExposedDropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false }
+                    ) {
+                        IMAGE_KEY_CHOICES.forEach { key ->
+                            DropdownMenuItem(
+                                text = { Text(key, color = Coffee) },
+                                onClick = {
+                                    selectedImageKey = key
+                                    expanded = false
+                                }
+                            )
+                        }
                     }
                 }
             }
@@ -222,12 +239,7 @@ fun ShopItemEditScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text("Available", color = Coffee)
-                Switch(
-                    checked = available,
-                    onCheckedChange = { available = it },
-                    colors = switchColors
-                )
+
             }
 
             Spacer(Modifier.height(16.dp))
@@ -269,7 +281,6 @@ fun ShopItemEditScreen(
                         val data = hashMapOf(
                             "name" to finalName,
                             "price" to finalPrice,
-                            "available" to available,
                             "imageKey" to selectedImageKey
                         )
 

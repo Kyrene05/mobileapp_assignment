@@ -34,7 +34,7 @@ fun TaskScreen(
     onBack: (() -> Unit)? = null,
     onNavHome: () -> Unit = {},
     onNavTasks: () -> Unit = {},
-    onNavQuote: () -> Unit = {},
+    onOpenShop: () -> Unit = {},
     onNavProfile: () -> Unit = {},
     onOpenRecord: (Task) -> Unit = {},
     vm: TaskViewModel = viewModel(factory = TaskViewModel.Factory)
@@ -86,7 +86,7 @@ fun TaskScreen(
                     when (idx) {
                         0 -> onNavHome()
                         1 -> onNavTasks()   // already here
-                        2 -> onNavQuote()
+                        2 -> onOpenShop()
                         3 -> onNavProfile()
                     }
                 }

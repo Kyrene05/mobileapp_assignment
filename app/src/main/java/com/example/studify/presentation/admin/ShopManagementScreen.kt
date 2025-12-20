@@ -35,7 +35,6 @@ data class ShopItem(
     val id: String = "",
     val name: String = "",
     val price: Int = 0,
-    val available: Boolean = true,
     val imageKey: String = ""
 )
 
@@ -68,7 +67,6 @@ fun ShopManagementScreen(
                             id = doc.id,
                             name = doc.getString("name") ?: "",
                             price = (doc.getLong("price") ?: 0L).toInt(),
-                            available = doc.getBoolean("available") ?: true,
                             imageKey = doc.getString("imageKey") ?: ""
                         )
                     }?.sortedBy { it.name.lowercase() } ?: emptyList()
@@ -206,7 +204,6 @@ private fun ShopItemRow(
     context: Context
 ) {
     val borderColor = if (selected) Coffee else Color.Transparent
-    val statusText = if (item.available) "Available" else "Unavailable"
 
     Surface(
         modifier = Modifier
@@ -269,12 +266,6 @@ private fun ShopItemRow(
                 )
                 Text(
                     text = "Price: 💰 ${item.price}",
-                    color = Coffee,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Medium
-                )
-                Text(
-                    text = "Status : $statusText",
                     color = Coffee,
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Medium

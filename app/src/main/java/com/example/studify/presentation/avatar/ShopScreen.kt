@@ -60,6 +60,7 @@ fun ShopScreen(
     var buyTarget by remember { mutableStateOf<AccessoryItem?>(null) }
     var sellTarget by remember { mutableStateOf<AccessoryItem?>(null) }
     var gridClicksEnabled by remember { mutableStateOf(true) }
+    var showSuccessDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(tab) {
         buyTarget = null
@@ -112,75 +113,142 @@ fun ShopScreen(
             )
         }
     ) { innerPadding ->
-        Column(
-            modifier = Modifier.padding(innerPadding).padding(horizontal = 16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+        // Use BoxWithConstraints to check orientation
+        BoxWithConstraints(
+            modifier = Modifier.fillMaxSize().padding(innerPadding)
         ) {
-            Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.End) {
-                Text("💰 $coins", color = Coffee, fontWeight = FontWeight.Bold)
-            }
+            val isLandscape = maxWidth > maxHeight
 
-            AvatarPreview(
-                profile = profile.copy(owned = owned, accessories = accessories.toList()),
-                modifier = Modifier.size(200.dp)
-            )
+            if (isLandscape) {
+                // --- LANDSCAPE: Side-by-Side ---
+                Row(
+                    modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+                    verticalAlignment = Alignment.Top
+                ) {
+                    // --- LANDSCAPE: Left Column Update ---
+                    Column(
+                        modifier = Modifier.weight(0.4f).fillMaxHeight(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Top // Change from Center to Top
+                    ) {
+                        Spacer(Modifier.height(8.dp)) // Add small top margin
 
-            TabRow(selectedTabIndex = tab.ordinal, containerColor = Cream, contentColor = Coffee, indicator = {}) {
-                Tab(selected = tab == ShopTab.Shop, onClick = { tab = ShopTab.Shop }, text = { Text("Shop") })
-                Tab(selected = tab == ShopTab.Wardrobe, onClick = { tab = ShopTab.Wardrobe }, text = { Text("Wardrobe") })
-            }
+                        // Position coins clearly at the top
+                        Text(
+                            text = "💰 $coins",
+                            color = Coffee,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp // Explicit size for visibility
+                        )
 
-            // HINT TEXT FOR WARDROBE
-            if (tab == ShopTab.Wardrobe) {
-                Spacer(Modifier.height(8.dp))
-                Text("Long press to sell it", color = Stone, fontSize = 12.sp)
-            }
+                        Spacer(Modifier.height(12.dp)) // Vertical gap between coins and avatar
 
-            val gridItems = if (tab == ShopTab.Wardrobe) {
-                (shopItems + ACCESSORIES_BASE.map { AccessoryItem(it.id, it.name, it.resId, 0) })
-                    .distinctBy { it.id }.filter { it.id in owned }
-            } else shopItems
+                        AvatarPreview(
+                            profile = profile.copy(owned = owned, accessories = accessories.toList()),
+                            modifier = Modifier.size(180.dp) // Slightly reduce size to 160.dp for landscape
+                        )
 
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(3),
-                modifier = Modifier.weight(1f).fillMaxWidth().padding(top = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                items(gridItems, key = { it.id }) { item ->
-                    AccessoryCard(
-                        item = item,
-                        owned = item.id in owned,
-                        equipped = item.id in accessories,
-                        canAfford = coins >= item.price,
-                        tab = tab,
-                        enabled = gridClicksEnabled,
-                        onClick = {
-                            if (tab == ShopTab.Wardrobe) {
-                                accessories = if (item.id in accessories) accessories - item.id else accessories + item.id
-                            } else if (item.id !in owned) {
-                                buyTarget = item
+                        if (tab == ShopTab.Wardrobe) {
+                            Spacer(Modifier.weight(1f)) // Push button to the very bottom
+                            Button(
+                                onClick = { /* save logic */ },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = 8.dp)
+                                    .height(40.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Banana)
+                            ) {
+                                Text("SAVE", color = Coffee, fontWeight = FontWeight.Bold)
                             }
-                        },
-                        onLongPress = {
-                            if (tab == ShopTab.Wardrobe && item.id in owned && item.id !in DEFAULT_OWNED) sellTarget = item
                         }
-                    )
-                }
-            }
+                    }
 
-            if (tab == ShopTab.Wardrobe) {
-                Button(
-                    onClick = {
-                        scope.launch {
-                            val toSave = profile.copy(owned = owned, accessories = accessories.toList())
-                            AvatarRepository.updateAvatarAndCoins(toSave, coins)
-                                .onSuccess { snackbarHostState.showSnackbar("Outfit saved!"); onSaveDone() }
+                    Spacer(Modifier.width(16.dp))
+
+                    // Right Column: Tabs + Grid
+                    Column(modifier = Modifier.weight(0.6f).fillMaxHeight()) {
+                        TabRow(selectedTabIndex = tab.ordinal, containerColor = Cream, contentColor = Coffee, indicator = {}) {
+                            Tab(selected = tab == ShopTab.Shop, onClick = { tab = ShopTab.Shop }, text = { Text("Shop") })
+                            Tab(selected = tab == ShopTab.Wardrobe, onClick = { tab = ShopTab.Wardrobe }, text = { Text("Wardrobe") })
                         }
-                    },
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp).height(50.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Banana)
-                ) { Text("SAVE OUTFIT", color = Coffee, fontWeight = FontWeight.Bold) }
+
+                        ShopGrid(
+                            gridItems = if (tab == ShopTab.Wardrobe) {
+                                (shopItems + ACCESSORIES_BASE.map { AccessoryItem(it.id, it.name, it.resId, 0) })
+                                    .distinctBy { it.id }.filter { it.id in owned }
+                            } else shopItems,
+                            owned = owned,
+                            accessories = accessories,
+                            coins = coins,
+                            tab = tab,
+                            enabled = gridClicksEnabled,
+                            onItemClick = { item ->
+                                if (tab == ShopTab.Wardrobe) {
+                                    accessories = if (item.id in accessories) accessories - item.id else accessories + item.id
+                                } else if (item.id !in owned) {
+                                    buyTarget = item
+                                }
+                            },
+                            onItemLongPress = { item ->
+                                if (tab == ShopTab.Wardrobe && item.id in owned && item.id !in DEFAULT_OWNED) sellTarget = item
+                            }
+                        )
+                    }
+                }
+            } else {
+                // --- PORTRAIT: Original Vertical Layout ---
+                Column(
+                    modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.End) {
+                        Text("💰 $coins", color = Coffee, fontWeight = FontWeight.Bold)
+                    }
+
+                    AvatarPreview(
+                        profile = profile.copy(owned = owned, accessories = accessories.toList()),
+                        modifier = Modifier.size(200.dp)
+                    )
+
+                    TabRow(selectedTabIndex = tab.ordinal, containerColor = Cream, contentColor = Coffee, indicator = {}) {
+                        Tab(selected = tab == ShopTab.Shop, onClick = { tab = ShopTab.Shop }, text = { Text("Shop") })
+                        Tab(selected = tab == ShopTab.Wardrobe, onClick = { tab = ShopTab.Wardrobe }, text = { Text("Wardrobe") })
+                    }
+
+                    val gridItems = if (tab == ShopTab.Wardrobe) {
+                        (shopItems + ACCESSORIES_BASE.map { AccessoryItem(it.id, it.name, it.resId, 0) })
+                            .distinctBy { it.id }.filter { it.id in owned }
+                    } else shopItems
+
+                    Box(modifier = Modifier.weight(1f)) {
+                        ShopGrid(gridItems, owned, accessories, coins, tab, gridClicksEnabled,
+                            onItemClick = { item ->
+                                if (tab == ShopTab.Wardrobe) {
+                                    accessories = if (item.id in accessories) accessories - item.id else accessories + item.id
+                                } else if (item.id !in owned) {
+                                    buyTarget = item
+                                }
+                            },
+                            onItemLongPress = { item ->
+                                if (tab == ShopTab.Wardrobe && item.id in owned && item.id !in DEFAULT_OWNED) sellTarget = item
+                            }
+                        )
+                    }
+
+                    if (tab == ShopTab.Wardrobe) {
+                        Button(
+                            onClick = {
+                                scope.launch {
+                                    val toSave = profile.copy(owned = owned, accessories = accessories.toList())
+                                    AvatarRepository.updateAvatarAndCoins(toSave, coins)
+                                        .onSuccess { snackbarHostState.showSnackbar("Outfit saved!"); onSaveDone() }
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp).height(50.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Banana)
+                        ) { Text("SAVE OUTFIT", color = Coffee, fontWeight = FontWeight.Bold) }
+                    }
+                }
             }
         }
     }
@@ -196,12 +264,15 @@ fun ShopScreen(
                 val newCoins = coins - target.price
                 owned = owned + target.id
                 levelVm.updateCoins(newCoins)
-                buyTarget = null
+                buyTarget = null // Close the buy dialog
+
+                // NEW: Show the success message
+                showSuccessDialog = true
+
                 scope.launch {
                     val toSave = profile.copy(owned = owned, accessories = accessories.toList())
                     AvatarRepository.updateAvatarAndCoins(toSave, newCoins)
 
-                    // AUTOMATIC TRANSACTION RECORD
                     val tx = hashMapOf(
                         "type" to "BUY",
                         "itemName" to target.name,
@@ -210,6 +281,23 @@ fun ShopScreen(
                         "createdAt" to com.google.firebase.Timestamp.now()
                     )
                     db.collection("transactions").add(tx)
+                }
+            }
+        )
+    }
+    if (showSuccessDialog) {
+        AlertDialog(
+            onDismissRequest = { showSuccessDialog = false },
+            containerColor = Cream,
+            title = {
+                Text("Purchase Successful!", color = Coffee, fontWeight = FontWeight.Bold)
+            },
+            text = {
+                Text("Your new item is now available in the Wardrobe tab.", color = Coffee)
+            },
+            confirmButton = {
+                TextButton(onClick = { showSuccessDialog = false }) {
+                    Text("OK", color = Coffee, fontWeight = FontWeight.Bold)
                 }
             }
         )
@@ -245,6 +333,37 @@ fun ShopScreen(
         )
     }
 }
+@Composable
+fun ShopGrid(
+    gridItems: List<AccessoryItem>,
+    owned: Set<String>,
+    accessories: Set<String>,
+    coins: Int,
+    tab: ShopTab,
+    enabled: Boolean,
+    onItemClick: (AccessoryItem) -> Unit,
+    onItemLongPress: (AccessoryItem) -> Unit
+) {
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(3),
+        modifier = Modifier.fillMaxSize().padding(top = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        items(gridItems, key = { it.id }) { item ->
+            AccessoryCard(
+                item = item,
+                owned = item.id in owned,
+                equipped = item.id in accessories,
+                canAfford = coins >= item.price,
+                tab = tab,
+                enabled = enabled,
+                onClick = { onItemClick(item) },
+                onLongPress = { onItemLongPress(item) }
+            )
+        }
+    }
+}
 
 @Composable
 fun AccessoryCard(item: AccessoryItem, owned: Boolean, equipped: Boolean, canAfford: Boolean, tab: ShopTab, enabled: Boolean, onClick: () -> Unit, onLongPress: () -> Unit) {
@@ -269,17 +388,48 @@ fun BuyDialog(title: String, price: Int, canAfford: Boolean, onDismiss: () -> Un
     Dialog(onDismissRequest = onDismiss) {
         Surface(color = Cream, shape = RoundedCornerShape(20.dp)) {
             Column(Modifier.padding(20.dp)) {
-                Text(title, color = Coffee, fontWeight = FontWeight.Bold)
+                Text(title, color = Coffee, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+
                 Text("Price: $price", color = Coffee)
-                Row(Modifier.fillMaxWidth().padding(top = 16.dp), horizontalArrangement = Arrangement.End) {
-                    TextButton(onClick = onDismiss) { Text("Cancel") }
-                    Button(onClick = onConfirm, enabled = canAfford, colors = ButtonDefaults.buttonColors(Banana)) { Text("Buy", color = Coffee) }
+
+                // Show red warning if user cannot afford the item
+                if (!canAfford) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = "You don't have enough coins to buy it",
+                        color = Color.Red,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Cancel button set to Coffee color
+                    TextButton(onClick = onDismiss) {
+                        Text("Cancel", color = Coffee)
+                    }
+
+                    Spacer(Modifier.width(8.dp))
+
+                    Button(
+                        onClick = onConfirm,
+                        enabled = canAfford, // Button is disabled if coins are insufficient
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Banana,
+                            disabledContainerColor = Banana.copy(alpha = 0.5f)
+                        )
+                    ) {
+                        Text("Buy", color = Coffee)
+                    }
                 }
             }
         }
     }
 }
-
 @Composable
 fun SellDialog(title: String, price: Int, onDismiss: () -> Unit, onConfirm: () -> Unit) {
     Dialog(onDismissRequest = onDismiss) {
@@ -287,9 +437,15 @@ fun SellDialog(title: String, price: Int, onDismiss: () -> Unit, onConfirm: () -
             Column(Modifier.padding(20.dp)) {
                 Text(title, color = Coffee, fontWeight = FontWeight.Bold)
                 Text("Refund: $price", color = Coffee)
-                Row(Modifier.fillMaxWidth().padding(top = 16.dp), horizontalArrangement = Arrangement.End) {
+                Row(
+                    Modifier.fillMaxWidth().padding(top = 16.dp),
+                    horizontalArrangement = Arrangement.End
+                ) {
                     TextButton(onClick = onDismiss) { Text("Cancel") }
-                    Button(onClick = onConfirm, colors = ButtonDefaults.buttonColors(Banana)) { Text("Sell", color = Coffee) }
+                    Button(
+                        onClick = onConfirm,
+                        colors = ButtonDefaults.buttonColors(Banana)
+                    ) { Text("Sell", color = Coffee) }
                 }
             }
         }
