@@ -42,7 +42,7 @@ data class ShopItem(
 fun ShopManagementScreen(
     onBack: () -> Unit,
     onEdit: (itemId: String) -> Unit,
-    onAddNew: () -> Unit, // ✅ + Add New
+    onAddNew: () -> Unit, //  + Add New
 ) {
     val context = LocalContext.current
 
@@ -147,7 +147,7 @@ fun ShopManagementScreen(
                 }
             }
 
-            // ✅ Bottom buttons: + Add New & EDIT
+            //  Bottom buttons: + Add New & EDIT
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(14.dp)

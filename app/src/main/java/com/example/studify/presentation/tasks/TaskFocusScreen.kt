@@ -175,14 +175,24 @@ fun TaskFocusScreen(
             containerColor = Cream,
             onDismissRequest = { /* not cancellable by outside tap */ },
             title = {
-                Text("Session Completed", color = Coffee)
+                // Change title based on whether the timer finished naturally
+                Text(
+                    text = if (sessionEnded) "Session Completed" else "Finish Early?",
+                    color = Coffee
+                )
             },
             text = {
-                Text(
-                    text = "You focused for $actualMinutes min.\n" +
-                            "Gained $gainedExp XP and $gainedCoins coins.",
-                    color = Stone
-                )
+                Column {
+                    // Show the specific warning if finishing early
+                    if (!sessionEnded) {
+
+                    }
+                    Text(
+                        text = "You focused for $actualMinutes min.\n" +
+                                "Gained $gainedExp XP and $gainedCoins coins.",
+                        color = Stone
+                    )
+                }
             },
             confirmButton = {
                 TextButton(
@@ -193,25 +203,27 @@ fun TaskFocusScreen(
                         onBack()
                     }
                 ) {
-                    Text("Finish", color = Coffee)
+                    Text(if (sessionEnded) "OK" else "Finish", color = Coffee)
                 }
             },
             dismissButton = {
-                TextButton(
-                    onClick = {
-                        showFinishDialog = false
-                        if (!sessionEnded) {
-                            // User cancelled, allow them to resume if countdown not finished.
+                // Only show a cancel button if they haven't finished yet
+                if (!sessionEnded) {
+                    TextButton(
+                        onClick = {
+                            showFinishDialog = false
                             isFinished = false
+                            isRunning = true // Resume timer automatically
                         }
-                    }
-                ) {
+                    ){
                     Text("Cancel", color = Coffee.copy(alpha = 0.5f))
                 }
+            }
             }
         )
     }
 }
+
 // Helper component for the Task Details
 @Composable
 private fun TaskInfoCard(task: Task, modifier: Modifier = Modifier) {

@@ -25,7 +25,7 @@ object AvatarRepository {
             "updatedAt"   to FieldValue.serverTimestamp()
         )
         avatarDoc(uid).set(data, SetOptions.merge()).await()
-        Log.d(TAG, "✅ Avatar saved successfully")
+        Log.d(TAG, " Avatar saved successfully")
     }
 
     suspend fun checkUserRole(uid: String): String {

@@ -173,7 +173,7 @@ fun AppNavHost() {
                     nav.navigate("${Routes.ADMIN_SHOP_EDIT}?itemId=$itemId")
                 },
 
-                // ✅ Add New
+                //  Add New
                 onAddNew = {
                     nav.navigate(Routes.ADMIN_SHOP_EDIT)
                 }
