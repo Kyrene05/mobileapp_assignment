@@ -69,64 +69,64 @@ fun AvatarCreateScreen(
 
             Spacer(Modifier.height(8.dp))
 
-            if (tab == 0) {
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    listOf("grey", "pink", "blue").forEach { c ->
-                        FilterChip(
-                            selected = profile.baseColor == c,
-                            onClick = { if (!saving) profile = profile.copy(baseColor = c) },
-                            label = {
-                                Text(
-                                    c.replaceFirstChar { it.uppercase() },
-                                    color = if (profile.baseColor == c) Coffee else Coffee.copy(
-                                        alpha = 0.75f
+            // Main Content Area
+            Box(modifier = Modifier.weight(1f)) {
+                if (tab == 0) {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        listOf("grey", "pink", "blue").forEach { c ->
+                            FilterChip(
+                                selected = profile.baseColor == c,
+                                onClick = { if (!saving) profile = profile.copy(baseColor = c) },
+                                label = {
+                                    Text(
+                                        c.replaceFirstChar { it.uppercase() },
+                                        color = if (profile.baseColor == c) Coffee else Coffee.copy(alpha = 0.75f)
                                     )
-                                )
-                            },
-                            colors = FilterChipDefaults.filterChipColors(
-                                containerColor = Paper,
-                                selectedContainerColor = Banana.copy(alpha = 0.6f),
-                                labelColor = Coffee,
-                                selectedLabelColor = Coffee
-                            ),
-                            border = BorderStroke(
-                                width = 1.dp,
-                                color = if (profile.baseColor == c) Coffee else Stone.copy(alpha = 0.6f)
-                            ),
-                            enabled = !saving
-                        )
+                                },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    containerColor = Paper,
+                                    selectedContainerColor = Banana.copy(alpha = 0.6f),
+                                    labelColor = Coffee,
+                                    selectedLabelColor = Coffee
+                                ),
+                                border = BorderStroke(
+                                    width = 1.dp,
+                                    color = if (profile.baseColor == c) Coffee else Stone.copy(alpha = 0.6f)
+                                ),
+                                enabled = !saving
+                            )
+                        }
                     }
-                }
-            } else {
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(3),
-                    modifier = Modifier.fillMaxWidth().weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    contentPadding = PaddingValues(4.dp)
-                ) {
-                    items(ACCESSORIES_BASE) { item ->
-                        val selected = item.id in profile.accessories
-                        AccessoryCell(
-                            resId = item.resId,
-                            name = item.name,
-                            selected = selected,
-                            onClick = {
-                                if (saving) return@AccessoryCell
-                                profile = profile.copy(
-                                    accessories = profile.accessories
-                                        .toMutableList()
-                                        .apply { if (selected) remove(item.id) else add(item.id) }
-                                )
-                            }
-                        )
+                } else {
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(3),
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        contentPadding = PaddingValues(4.dp)
+                    ) {
+                        items(ACCESSORIES_BASE) { item ->
+                            val selected = item.id in profile.accessories
+                            AccessoryCell(
+                                resId = item.resId,
+                                name = item.name,
+                                selected = selected,
+                                onClick = {
+                                    if (saving) return@AccessoryCell
+                                    profile = profile.copy(
+                                        accessories = profile.accessories
+                                            .toMutableList()
+                                            .apply { if (selected) remove(item.id) else add(item.id) }
+                                    )
+                                }
+                            )
+                        }
                     }
                 }
             }
-
 
             if (error != null) {
                 Spacer(Modifier.height(6.dp))
@@ -137,43 +137,40 @@ fun AvatarCreateScreen(
                 )
             }
 
-            if (tab == 1) {
-                Spacer(Modifier.height(8.dp))
-                Button(
-                    onClick = {
+            // Universal Button at the bottom
+            Spacer(Modifier.height(8.dp))
+            Button(
+                onClick = {
+                    if (tab == 0) {
+                        tab = 1 // Navigate to Accessories tab
+                    } else {
+                        // Save logic for the final tab
                         error = null
                         saving = true
                         scope.launch {
-                            val result = AvatarRepository.save(profile)   // save to Firestore
+                            val result = AvatarRepository.save(profile)
                             saving = false
                             result.onSuccess { onNext(profile) }
                                 .onFailure { e ->
                                     error = e.message ?: "Save failed. Please try again."
                                 }
                         }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    enabled = !saving,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Banana,
-                        contentColor = Coffee,
-                        disabledContainerColor = Banana.copy(alpha = 0.5f),
-                        disabledContentColor = Coffee.copy(alpha = 0.5f),
-                    )
-                ) {
-                    if (saving) {
-                        CircularProgressIndicator(
-                            strokeWidth = 2.dp,
-                            modifier = Modifier.size(20.dp),
-                            color = Coffee
-                        )
-                    } else {
-                        Text("NEXT")
                     }
+                },
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+                shape = RoundedCornerShape(16.dp),
+                enabled = !saving,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Banana,
+                    contentColor = Coffee,
+                    disabledContainerColor = Banana.copy(alpha = 0.5f)
+                )
+            ) {
+                if (saving) {
+                    CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(20.dp), color = Coffee)
+                } else {
+                    Text("NEXT")
                 }
-            } else {
-                Spacer(Modifier.height(8.dp))
             }
         }
     }

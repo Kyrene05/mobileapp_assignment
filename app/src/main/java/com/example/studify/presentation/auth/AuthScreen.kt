@@ -78,7 +78,7 @@ fun AuthScreen(
                         label = "Username or Email",
                         value = user,
                         onValueChange = { user = it; error = null },
-                        placeholder = "yourname@example.com",
+                        placeholder = "yourname@gmail.com",
                         keyboardOptions = KeyboardOptions(
                             imeAction = ImeAction.Next,
                             keyboardType = KeyboardType.Email
@@ -91,7 +91,7 @@ fun AuthScreen(
                         label = "Password",
                         value = pwd,
                         onValueChange = { pwd = it; error = null },
-                        placeholder = "At least 6 characters",
+                        placeholder = "At least 8 characters",
                         keyboardOptions = KeyboardOptions(
                             imeAction = ImeAction.Done,
                             keyboardType = KeyboardType.Password
@@ -147,6 +147,7 @@ fun AuthScreen(
                 onClick = {
                     error = null
 
+                    // Inside Button onClick
                     val input = user.trim()
                     val password = pwd
 
@@ -154,8 +155,10 @@ fun AuthScreen(
                         error = "Please enter a valid email or username."
                         return@Button
                     }
-                    if (password.length < 6) {
-                        error = "Password must be at least 6 characters."
+
+// Check for "Proper" password rules (at least 1 letter and 1 number)
+                    if (password.length < 8 || !password.any { it.isDigit() } || !password.any { it.isLetter() }) {
+                        error = "Password must be at least 8 characters and contain letters and numbers."
                         return@Button
                     }
 
@@ -294,9 +297,16 @@ private fun LabeledTextField(
 }
 
 private fun looksLikeEmailOrName(input: String): Boolean {
-    if (input.length < 3) return false
-    val emailRegex = "[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+".toRegex()
-    return if (input.contains("@")) emailRegex.matches(input) else true
+    val trimmed = input.trim()
+    if (trimmed.length < 3) return false
+
+    return if (trimmed.contains("@")) {
+        // Use standard Android email pattern
+        android.util.Patterns.EMAIL_ADDRESS.matcher(trimmed).matches()
+    } else {
+        // Basic username check: alphanumeric and at least 3 chars
+        trimmed.all { it.isLetterOrDigit() }
+    }
 }
 
 @Preview(showBackground = true, backgroundColor = 0xFFF8E9D2)

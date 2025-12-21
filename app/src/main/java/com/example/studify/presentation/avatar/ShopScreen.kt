@@ -171,6 +171,14 @@ fun ShopScreen(
                             Tab(selected = tab == ShopTab.Shop, onClick = { tab = ShopTab.Shop }, text = { Text("Shop") })
                             Tab(selected = tab == ShopTab.Wardrobe, onClick = { tab = ShopTab.Wardrobe }, text = { Text("Wardrobe") })
                         }
+                        if (tab == ShopTab.Wardrobe) {
+                            Text(
+                                text = "Long press an item to sell it",
+                                color = Stone,
+                                fontSize = 12.sp,
+                                modifier = Modifier.padding(top = 8.dp, start = 4.dp)
+                            )
+                        }
 
                         ShopGrid(
                             gridItems = if (tab == ShopTab.Wardrobe) {
@@ -214,7 +222,14 @@ fun ShopScreen(
                         Tab(selected = tab == ShopTab.Shop, onClick = { tab = ShopTab.Shop }, text = { Text("Shop") })
                         Tab(selected = tab == ShopTab.Wardrobe, onClick = { tab = ShopTab.Wardrobe }, text = { Text("Wardrobe") })
                     }
-
+                    if (tab == ShopTab.Wardrobe) {
+                        Text(
+                            text = "Long press an item to sell it",
+                            color = Stone,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(top = 8.dp)
+                        )
+                    }
                     val gridItems = if (tab == ShopTab.Wardrobe) {
                         (shopItems + ACCESSORIES_BASE.map { AccessoryItem(it.id, it.name, it.resId, 0) })
                             .distinctBy { it.id }.filter { it.id in owned }
@@ -263,7 +278,7 @@ fun ShopScreen(
             onConfirm = {
                 val newCoins = coins - target.price
                 owned = owned + target.id
-                levelVm.updateCoins(newCoins)
+                levelVm.overrideCoins(newCoins)
                 buyTarget = null // Close the buy dialog
 
                 // NEW: Show the success message
@@ -313,7 +328,7 @@ fun ShopScreen(
                 val newCoins = coins + sellPrice
                 owned = owned - item.id
                 accessories = accessories - item.id
-                levelVm.updateCoins(newCoins)
+                levelVm.overrideCoins(newCoins)
                 sellTarget = null
                 scope.launch {
                     val toSave = profile.copy(owned = owned, accessories = accessories.toList())

@@ -47,14 +47,14 @@ class LevelViewModel(app: Application) : AndroidViewModel(app) {
         if (exp <= 0 && coinsGain <= 0) return
 
         viewModelScope.launch {
-            var p = _progress.value
+            // Use a local copy to ensure thread safety during calculation
+            val currentProgress = _progress.value
+            var newXp = currentProgress.xp + exp
+            var newLevel = currentProgress.level
+            var newCoins = currentProgress.coins + coinsGain
+            var newNext = currentProgress.nextLevelXp
 
-            var newXp = p.xp + exp
-            var newLevel = p.level
-            var newCoins = p.coins + coinsGain
-            var newNext = p.nextLevelXp
-
-            // Level up calculation
+            // Loop handles "multi-leveling" if user gets massive XP at once
             while (newXp >= newNext) {
                 newXp -= newNext
                 newLevel += 1
@@ -62,24 +62,19 @@ class LevelViewModel(app: Application) : AndroidViewModel(app) {
                 newNext = calcNextLevelXp(newLevel)
             }
 
-            val updated = PlayerProgress(
+            val updated = currentProgress.copy(
                 level = newLevel,
                 xp = newXp,
                 nextLevelXp = newNext,
                 coins = newCoins
             )
 
+            // Update the StateFlow first so UI reacts immediately
             _progress.value = updated
+
+            // Then persist to Firestore
             saveToFirebase(updated)
         }
-    }
-    fun updateCoins(newCoins: Int) {
-        val current = _progress.value
-        val updated = current.copy(coins = newCoins)
-
-        _progress.value = updated
-
-        saveToFirebase(updated)
     }
 
     // -----------------------------------------------------
@@ -137,11 +132,18 @@ class LevelViewModel(app: Application) : AndroidViewModel(app) {
     // -----------------------------------------------------
     // 🔻 XP calculation
     // -----------------------------------------------------
+    // 🔻 Updated XP calculation in LevelViewModel.kt
     private fun calcNextLevelXp(level: Int): Int {
-        val base = 10000
+        val base = 10000.0 // Keep as double for precise math
         val growth = 1.2
+
+        // Level 1 = 10,000
+        // Level 2 = 10,000 * 1.2 = 12,000
+        // Level 3 = 10,000 * 1.2^2 = 14,400
         val raw = base * Math.pow(growth, (level - 1).toDouble())
-        return (raw / 10).toInt() * 10
+
+        // Round to the nearest 100 for a "clean" UI look
+        return (raw / 100).toInt() * 100
     }
 
     private fun levelUpReward(level: Int): Int {

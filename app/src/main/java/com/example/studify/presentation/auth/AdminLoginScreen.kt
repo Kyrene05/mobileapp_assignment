@@ -154,12 +154,15 @@ fun AdminLoginScreen(
                     val e = email.trim()
                     val p = pwd
 
+                    // Use the proper email pattern check
                     if (!looksLikeEmail(e)) {
                         error = "Please enter a valid admin email."
                         return@Button
                     }
-                    if (p.length < 6) {
-                        error = "Password must be at least 6 characters."
+
+                    // Enforce same complexity as registration: 6 chars + letter + number
+                    if (p.length < 6 || !p.any { it.isDigit() } || !p.any { it.isLetter() }) {
+                        error = "Admin password must be at least 6 characters and contain letters and numbers."
                         return@Button
                     }
 
@@ -191,10 +194,14 @@ fun AdminLoginScreen(
                             }
                         } catch (ex: Exception) {
                             loading = false
-                            error = try {
-                                AuthRepository.signInErrorMessage(ex)
-                            } catch (_: Exception) {
-                                ex.message ?: "Login failed."
+                            error = when (ex) {
+                                is com.google.firebase.auth.FirebaseAuthInvalidUserException ->
+                                    "No admin account found with this email."
+                                is com.google.firebase.auth.FirebaseAuthInvalidCredentialsException ->
+                                    "Incorrect admin password. Please try again."
+                                is com.google.firebase.FirebaseNetworkException ->
+                                    "Network error. Please check your connection."
+                                else -> ex.localizedMessage ?: "Admin login failed."
                             }
                         }
                     }
@@ -279,9 +286,10 @@ private fun LabeledTextField(
 }
 
 private fun looksLikeEmail(input: String): Boolean {
-    if (input.length < 5) return false
-    val emailRegex = "[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+".toRegex()
-    return emailRegex.matches(input)
+    val trimmed = input.trim()
+    if (trimmed.isEmpty()) return false
+    // Using official Android pattern is more reliable than custom regex
+    return android.util.Patterns.EMAIL_ADDRESS.matcher(trimmed).matches()
 }
 
 @Preview(showBackground = true, backgroundColor = 0xFFF8E9D2)

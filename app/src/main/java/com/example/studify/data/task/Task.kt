@@ -10,6 +10,7 @@ package com.example.studify.data.task
  */
 data class Task(
     val id: Long,
+    val userId: String,
     val title: String,
     val minutes: Int,
     val coins: Int,

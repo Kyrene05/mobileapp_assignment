@@ -22,11 +22,13 @@ class TaskViewModel(app: Application) : AndroidViewModel(app) {
     private val db = AppDatabase.getInstance(app)
     private val taskDao = db.taskDao()
     private val sessionDao = db.studySessionDao()
+    private val currentUid: String
+        get() = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid ?: ""
 
     // ---------- Task list (Room -> Domain) ----------
 
     val tasks: StateFlow<List<Task>> =
-        taskDao.getAll()                       // Flow<List<TaskEntity>>
+        taskDao.getAllForUser(currentUid)                       // Flow<List<TaskEntity>>
             .map { entities -> entities.map { it.toDomain() } }
             .stateIn(
                 scope = viewModelScope,
@@ -53,6 +55,7 @@ class TaskViewModel(app: Application) : AndroidViewModel(app) {
             taskDao.insert(
                 TaskEntity(
                     id = 0,
+                    userId = currentUid,
                     title = title,
                     minutes = minutes,
                     coins = coins,
@@ -162,6 +165,7 @@ class TaskViewModel(app: Application) : AndroidViewModel(app) {
 private fun TaskEntity.toDomain(): Task =
     Task(
         id = id,
+        userId=userId,
         title = title,
         minutes = minutes,
         coins = coins,
@@ -174,6 +178,7 @@ private fun TaskEntity.toDomain(): Task =
 private fun Task.toEntity(): TaskEntity =
     TaskEntity(
         id = id,
+        userId=userId,
         title = title,
         minutes = minutes,
         coins = coins,

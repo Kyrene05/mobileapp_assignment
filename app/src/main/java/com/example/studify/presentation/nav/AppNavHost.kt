@@ -116,10 +116,8 @@ fun AppNavHost() {
         composable(Routes.REGISTER) {
             RegisterScreen(
                 onRegisterSuccess = {
-                    nav.navigate(Routes.AUTH) {
-                        popUpTo(Routes.REGISTER) { inclusive = true }
-                        launchSingleTop = true
-                    }
+
+
                 },
                 onBackToLogin = { nav.popBackStack() }
             )

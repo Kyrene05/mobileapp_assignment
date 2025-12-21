@@ -24,7 +24,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
@@ -33,7 +32,6 @@ import com.example.studify.ui.theme.Banana
 import com.example.studify.ui.theme.Coffee
 import com.example.studify.ui.theme.Cream
 import com.example.studify.ui.theme.Paper
-import com.example.studify.ui.theme.Stone
 import kotlinx.coroutines.launch
 
 
@@ -298,30 +296,4 @@ private fun SwipeToStartBar(
     }
 }
 
-/* ---------------------- Preview ---------------------- */
 
-@Preview(
-    name = "TaskRecordScreen – Preview",
-    showBackground = true,
-    backgroundColor = 0xFFF8E9D2,
-    widthDp = 360,
-    heightDp = 740
-)
-@Composable
-private fun PreviewTaskRecordScreen() {
-    val fakeTask = Task(
-        id = 1L,
-        title = "Learn DFS & BFS",
-        minutes = 25,
-        coins = 250,
-        done = false
-    )
-
-    MaterialTheme {
-        TaskRecordScreen(
-            task = fakeTask,
-            onBack = {},
-            onStartFocus = {}
-        )
-    }
-}

@@ -8,11 +8,13 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.studify.R
@@ -40,8 +42,8 @@ fun HomeScreen(
     LaunchedEffect(Unit) {
         levelVm.refreshFromFirebase()
     }
-    val progress by levelVm.progress.collectAsState()
 
+    val progress by levelVm.progress.collectAsState()
     var avatar by remember { mutableStateOf(AvatarProfile(baseColor = "grey")) }
     val scope = rememberCoroutineScope()
 
@@ -56,6 +58,21 @@ fun HomeScreen(
 
     var selectedPaymentMethod by remember { mutableStateOf("Online Banking / FPX") }
 
+    var isInitialLoad by rememberSaveable { mutableStateOf(true) }
+    var showLevelUpDialog by rememberSaveable { mutableStateOf(false) }
+    var levelReached by rememberSaveable { mutableIntStateOf(progress.level) }
+    // Listen for level increases to trigger the dialog
+    LaunchedEffect(progress.level) {
+        if (isInitialLoad) {
+            levelReached = progress.level
+            isInitialLoad = false
+        } else {
+            if (progress.level > levelReached) {
+                levelReached = progress.level
+                showLevelUpDialog = true
+            }
+        }
+    }
     data class CoinPackage(
         val id: Int,
         val name: String,
@@ -170,8 +187,9 @@ fun HomeScreen(
                             Icon(Icons.Filled.Add, "Top up", tint = Coffee)
                         }
                     }
-                    Spacer(Modifier.height(230.dp)) // This is the spacer that breaks landscape
-                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    Spacer(Modifier.height(140.dp))
+                    Spacer(Modifier.weight(0.1f)) // Flexible spacing instead of 230.dp
+                    Box(modifier = Modifier.weight(2f), contentAlignment = Alignment.Center) {
                         AvatarPreview(profile = avatar, modifier = Modifier.size(260.dp))
                     }
                 }
@@ -393,6 +411,41 @@ fun HomeScreen(
             confirmButton = {
                 TextButton(onClick = { showTopUpResultDialog = false }) {
                     Text("OK", color = Coffee)
+                }
+            }
+        )
+    }
+    // ================== Dialog 4: Level Up Celebration ==================
+    if (showLevelUpDialog) {
+        AlertDialog(
+            onDismissRequest = { showLevelUpDialog = false },
+            containerColor = Banana, // Uses themed color for celebration
+            title = {
+                Text("🎉 LEVEL UP!", color = Coffee, style = MaterialTheme.typography.headlineMedium)
+            },
+            text = {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        "Congratulations! You've reached Level $levelReached!",
+                        color = Coffee,
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    // Visual representation of the new level
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = Coffee,
+                        modifier = Modifier.size(80.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text("$levelReached", color = Cream, style = MaterialTheme.typography.displaySmall)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showLevelUpDialog = false }) {
+                    Text("SURE", color = Coffee, fontWeight = FontWeight.Bold)
                 }
             }
         )

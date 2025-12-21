@@ -30,7 +30,7 @@ fun BottomBar(
     NavigationBar(
         containerColor = Banana,
         tonalElevation = 0.dp,
-        windowInsets = WindowInsets(0)
+        windowInsets = NavigationBarDefaults.windowInsets
     ) {
         // Home
         NavigationBarItem(

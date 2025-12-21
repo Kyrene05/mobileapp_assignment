@@ -13,8 +13,8 @@ import kotlinx.coroutines.flow.Flow
 interface TaskDao {
 
 
-    @Query("SELECT * FROM tasks ORDER BY id DESC")
-    fun getAll(): Flow<List<TaskEntity>>
+    @Query("SELECT * FROM tasks WHERE userId = :currentUid ORDER BY id DESC")
+    fun getAllForUser(currentUid: String): Flow<List<TaskEntity>>
 
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
