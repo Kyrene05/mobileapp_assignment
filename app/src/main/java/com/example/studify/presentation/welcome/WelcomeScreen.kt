@@ -25,9 +25,7 @@ import com.example.studify.ui.theme.Stone
 
 @Composable
 fun WelcomeScreen(
-    onGoLogin: () -> Unit,          // normal user flow
-    onGoAdminLogin: () -> Unit,     // NEW: admin login flow
-    onViewTerms: () -> Unit = {},
+    onGoLogin: () -> Unit,
     showTosInitially: Boolean = false
 ) {
     var showTos by rememberSaveable { mutableStateOf(showTosInitially) }
@@ -134,8 +132,6 @@ private fun PreviewWelcome() {
     MaterialTheme {
         WelcomeScreen(
             onGoLogin = {},
-            onGoAdminLogin = {},   // preview stub
-            onViewTerms = {}
         )
     }
 }
@@ -150,8 +146,6 @@ private fun PreviewWelcomeWithDialog() {
     MaterialTheme {
         WelcomeScreen(
             onGoLogin = {},
-            onGoAdminLogin = {},
-            onViewTerms = {},
             showTosInitially = true
         )
     }

@@ -132,7 +132,7 @@ fun TaskScreen(
         }
     }
 
-    // ➕ Create dialog
+    //  Create dialog
     if (showCreate) {
         TaskEditorDialog(
             titleInit = "",
@@ -145,7 +145,7 @@ fun TaskScreen(
         )
     }
 
-    // ✏️ Edit dialog
+    // ✏ Edit dialog
     editTarget?.let { t ->
         TaskEditorDialog(
             titleInit = t.title,

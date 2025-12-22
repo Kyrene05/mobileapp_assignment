@@ -206,6 +206,7 @@ fun HomeScreen(
             confirmButton = {
                 TextButton(onClick = {
                     showLogoutConfirmation = false
+                    levelVm.clearData()
                     onLogout() // Execute actual logout
                 }) {
                     Text("Logout", color = Coffee)

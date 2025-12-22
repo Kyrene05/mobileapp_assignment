@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalMaterial3Api::class)
-
 package com.example.studify.presentation.tasks
 
 import androidx.compose.animation.core.LinearEasing

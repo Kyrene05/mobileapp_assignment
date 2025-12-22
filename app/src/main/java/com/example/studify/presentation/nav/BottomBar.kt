@@ -1,12 +1,9 @@
 package com.example.studify.presentation.nav
 
-import androidx.compose.foundation.layout.WindowInsets
+
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.List
-import androidx.compose.material.icons.filled.Logout
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Timer   // ⬅️ 新增：Pomodoro 用计时器图标
+import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.dp

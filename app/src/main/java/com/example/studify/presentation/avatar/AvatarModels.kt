@@ -4,6 +4,13 @@ package com.example.studify.presentation.avatar
 import androidx.annotation.DrawableRes
 import com.example.studify.R
 
+data class AccessoryItem(
+    val id: String,
+    val name: String,
+    @DrawableRes val resId: Int,
+    val price: Int
+)
+
 data class AvatarProfile(
     val baseColor: String = "grey",
     val accessories: List<String> = emptyList(),

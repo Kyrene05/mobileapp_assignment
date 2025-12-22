@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
-// 🔹 Firestore data class
+//  Firestore data class
 data class PlayerProgress(
     val level: Int = 1,
     val xp: Int = 0,
@@ -40,8 +40,11 @@ class LevelViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun clearData() {
+        _progress.value = PlayerProgress()
+    }
     // -----------------------------------------------------
-    // ⭐ 1. pomodoro reward: gain XP & Coins
+    //  1. pomodoro reward: gain XP & Coins
     // -----------------------------------------------------
     fun grantSessionReward(exp: Int, coinsGain: Int = exp) {
         if (exp <= 0 && coinsGain <= 0) return
@@ -78,7 +81,7 @@ class LevelViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     // -----------------------------------------------------
-    // ⭐ 2. Shop
+    //  2. Shop
     // -----------------------------------------------------
     fun overrideCoins(newCoins: Int) {
         val p = _progress.value
@@ -90,10 +93,15 @@ class LevelViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     // -----------------------------------------------------
-    // 🔻 Firebase load & save
+    //  Firebase load & save
     // -----------------------------------------------------
     private suspend fun loadFromFirebase() {
-        val uid = userId ?: return
+        val uid = userId
+        if (uid == null) {
+            _progress.value = PlayerProgress()
+            return
+        }
+
         try {
             val doc = db.collection("users")
                 .document(uid)
@@ -108,9 +116,11 @@ class LevelViewModel(app: Application) : AndroidViewModel(app) {
                     _progress.value = loaded
                 }
             } else {
-                saveToFirebase(_progress.value)
+                val freshStart = PlayerProgress()
+                _progress.value = freshStart
+                saveToFirebase(freshStart)
             }
-        } catch (_: Exception) {
+        } catch (e: Exception) {
         }
     }
 
@@ -130,9 +140,9 @@ class LevelViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     // -----------------------------------------------------
-    // 🔻 XP calculation
+    //  XP calculation
     // -----------------------------------------------------
-    // 🔻 Updated XP calculation in LevelViewModel.kt
+    //  Updated XP calculation in LevelViewModel.kt
     private fun calcNextLevelXp(level: Int): Int {
         val base = 10000.0 // Keep as double for precise math
         val growth = 1.2

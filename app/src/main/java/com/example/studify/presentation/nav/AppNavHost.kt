@@ -18,7 +18,6 @@ import com.example.studify.presentation.admin.ShopItemEditScreen
 import com.example.studify.presentation.admin.ShopManagementScreen
 import com.example.studify.presentation.auth.*
 import com.example.studify.presentation.avatar.AvatarCreateScreen
-import com.example.studify.presentation.avatar.AvatarProfile
 import com.example.studify.presentation.avatar.ShopScreen
 import com.example.studify.presentation.home.HomeScreen
 import com.example.studify.presentation.home.LevelViewModel
@@ -27,7 +26,6 @@ import com.example.studify.presentation.tasks.*
 import com.example.studify.presentation.welcome.WelcomeScreen
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.Source
 import kotlinx.coroutines.tasks.await
 
 /* ---------------- Routes ---------------- */
@@ -88,11 +86,6 @@ fun AppNavHost() {
             WelcomeScreen(
                 onGoLogin = {
                     nav.navigate(Routes.AUTH) {
-                        popUpTo(Routes.WELCOME) { inclusive = true }
-                    }
-                },
-                onGoAdminLogin = {
-                    nav.navigate(Routes.ADMIN_AUTH) {
                         popUpTo(Routes.WELCOME) { inclusive = true }
                     }
                 }
