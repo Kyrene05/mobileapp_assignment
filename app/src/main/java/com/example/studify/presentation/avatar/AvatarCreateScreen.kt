@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
@@ -31,145 +32,151 @@ fun AvatarCreateScreen(
 ) {
     var profile by remember { mutableStateOf(AvatarProfile()) }
     var tab by remember { mutableStateOf(initialTab) }
-
     var saving by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
 
-    Surface(color = Cream, modifier = Modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxSize().padding(16.dp)) {
-            Text("Customize your cat", color = Coffee, style = MaterialTheme.typography.titleLarge)
-            Spacer(Modifier.height(12.dp))
+    // 1. Use Scaffold to handle the Status Bar and Navigation Bar
+    Scaffold(
+        containerColor = Cream,
+        contentWindowInsets = WindowInsets.systemBars // Ensures content stays away from camera notch and home bar
+    ) { innerPadding ->
+        // 2. Wrap everything in a Column that uses the innerPadding
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding) // This is the crucial fix for the overlapping bars
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+        ) {
+            Text(
+                "Customize your cat",
+                color = Coffee,
+                style = MaterialTheme.typography.titleLarge
+            )
 
-            AvatarPreview(profile, modifier = Modifier.fillMaxWidth().height(260.dp))
+            // 3. BoxWithConstraints allows us to shrink the cat if the screen height is small
+            BoxWithConstraints(modifier = Modifier.weight(1f)) {
+                val isSmallScreen = maxHeight < 500.dp
 
-            Spacer(Modifier.height(12.dp))
+                Column {
+                    AvatarPreview(
+                        profile,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(if (isSmallScreen) 180.dp else 260.dp) // Adjusts size dynamically
+                    )
 
-            TabRow(
-                selectedTabIndex = tab,
-                containerColor = Cream,
-                contentColor = Coffee,
-                indicator = {}
-            ) {
-                Tab(
-                    selected = tab == 0,
-                    onClick = { tab = 0 },
-                    text = { Text("Color") },
-                    selectedContentColor = Coffee,
-                    unselectedContentColor = Stone
-                )
-                Tab(
-                    selected = tab == 1,
-                    onClick = { tab = 1 },
-                    text = { Text("Accessories") },
-                    selectedContentColor = Coffee,
-                    unselectedContentColor = Stone
-                )
-            }
+                    Spacer(Modifier.height(8.dp))
 
-            Spacer(Modifier.height(8.dp))
-
-            // Main Content Area
-            Box(modifier = Modifier.weight(1f)) {
-                if (tab == 0) {
-                    Row(
-                        Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    TabRow(
+                        selectedTabIndex = tab,
+                        containerColor = Cream,
+                        contentColor = Coffee,
+                        indicator = {}
                     ) {
-                        listOf("grey", "pink", "blue").forEach { c ->
-                            FilterChip(
-                                selected = profile.baseColor == c,
-                                onClick = { if (!saving) profile = profile.copy(baseColor = c) },
-                                label = {
-                                    Text(
-                                        c.replaceFirstChar { it.uppercase() },
-                                        color = if (profile.baseColor == c) Coffee else Coffee.copy(alpha = 0.75f)
-                                    )
-                                },
-                                colors = FilterChipDefaults.filterChipColors(
-                                    containerColor = Paper,
-                                    selectedContainerColor = Banana.copy(alpha = 0.6f),
-                                    labelColor = Coffee,
-                                    selectedLabelColor = Coffee
-                                ),
-                                border = BorderStroke(
-                                    width = 1.dp,
-                                    color = if (profile.baseColor == c) Coffee else Stone.copy(alpha = 0.6f)
-                                ),
-                                enabled = !saving
-                            )
-                        }
+                        Tab(
+                            selected = tab == 0,
+                            onClick = { tab = 0 },
+                            text = { Text("Color") },
+                            selectedContentColor = Coffee,
+                            unselectedContentColor = Stone
+                        )
+                        Tab(
+                            selected = tab == 1,
+                            onClick = { tab = 1 },
+                            text = { Text("Accessories") },
+                            selectedContentColor = Coffee,
+                            unselectedContentColor = Stone
+                        )
                     }
-                } else {
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(3),
-                        modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        contentPadding = PaddingValues(4.dp)
-                    ) {
-                        items(ACCESSORIES_BASE) { item ->
-                            val selected = item.id in profile.accessories
-                            AccessoryCell(
-                                resId = item.resId,
-                                name = item.name,
-                                selected = selected,
-                                onClick = {
-                                    if (saving) return@AccessoryCell
-                                    profile = profile.copy(
-                                        accessories = profile.accessories
-                                            .toMutableList()
-                                            .apply { if (selected) remove(item.id) else add(item.id) }
+
+                    Spacer(Modifier.height(8.dp))
+
+                    // Content Area (Grid or Color Chips)
+                    Box(modifier = Modifier.weight(1f)) {
+                        if (tab == 0) {
+                            Row(
+                                Modifier.fillMaxWidth().padding(top = 8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                listOf("grey", "pink", "blue").forEach { c ->
+                                    FilterChip(
+                                        selected = profile.baseColor == c,
+                                        onClick = { if (!saving) profile = profile.copy(baseColor = c) },
+                                        label = { Text(c.replaceFirstChar { it.uppercase() }) },
+                                        colors = FilterChipDefaults.filterChipColors(
+                                            containerColor = Paper,
+                                            selectedContainerColor = Banana.copy(alpha = 0.6f)
+                                        )
                                     )
                                 }
-                            )
+                            }
+                        } else {
+                            LazyVerticalGrid(
+                                columns = GridCells.Fixed(3),
+                                modifier = Modifier.fillMaxSize(),
+                                verticalArrangement = Arrangement.spacedBy(10.dp),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                contentPadding = PaddingValues(bottom = 16.dp)
+                            ) {
+                                items(ACCESSORIES_BASE) { item ->
+                                    val selected = item.id in profile.accessories
+                                    AccessoryCell(
+                                        resId = item.resId,
+                                        name = item.name,
+                                        selected = selected,
+                                        onClick = {
+                                            if (saving) return@AccessoryCell
+                                            profile = profile.copy(
+                                                accessories = if (selected)
+                                                    profile.accessories - item.id
+                                                else profile.accessories + item.id
+                                            )
+                                        }
+                                    )
+                                }
+                            }
                         }
                     }
                 }
             }
 
             if (error != null) {
-                Spacer(Modifier.height(6.dp))
                 Text(
                     text = error!!,
                     color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodySmall
+                    modifier = Modifier.padding(bottom = 4.dp)
                 )
             }
 
             // Universal Button at the bottom
-            Spacer(Modifier.height(8.dp))
             Button(
                 onClick = {
                     if (tab == 0) {
-                        tab = 1 // Navigate to Accessories tab
+                        tab = 1
                     } else {
-                        // Save logic for the final tab
                         error = null
                         saving = true
                         scope.launch {
                             val result = AvatarRepository.save(profile)
                             saving = false
                             result.onSuccess { onNext(profile) }
-                                .onFailure { e ->
-                                    error = e.message ?: "Save failed. Please try again."
-                                }
+                                .onFailure { e -> error = e.message ?: "Save failed." }
                         }
                     }
                 },
-                modifier = Modifier.fillMaxWidth().height(52.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp)
+                    .padding(bottom = 8.dp), // Extra margin for the bottom nav bar
                 shape = RoundedCornerShape(16.dp),
                 enabled = !saving,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Banana,
-                    contentColor = Coffee,
-                    disabledContainerColor = Banana.copy(alpha = 0.5f)
-                )
+                colors = ButtonDefaults.buttonColors(containerColor = Banana)
             ) {
                 if (saving) {
                     CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(20.dp), color = Coffee)
                 } else {
-                    Text("NEXT")
+                    Text("NEXT", fontWeight = FontWeight.Bold,color=Coffee)
                 }
             }
         }
